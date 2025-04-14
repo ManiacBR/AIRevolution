@@ -28,7 +28,7 @@ async def chamar_xai_api(mensagem):
             "Content-Type": "application/json"
         }
         payload = {
-            "model": "grok-beta",  # Modelo da xAI (pode mudar conforme a disponibilidade)
+            "model": "grok-3-latest",  # Atualizado pra grok-3-latest
             "messages": [
                 {"role": "system", "content": "Você é um bot amigável e curioso chamado AI Revolution, inspirado no Guia do Mochileiro das Galáxias. Responda de forma natural, amigável e com um toque de humor!"},
                 {"role": "user", "content": mensagem}
