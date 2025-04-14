@@ -4,6 +4,7 @@ import asyncio
 import random
 import time
 import os
+import aiohttp
 from dotenv import load_dotenv
 from mente import carregar_mente, escolher_interesse
 from etica import avaliar_risco
@@ -17,6 +18,35 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 ultima_resposta = {}  # Dicionário pra rastrear o último tempo de resposta por usuário
 COOLDOWN = 10  # 10 segundos de cooldown entre respostas pra um mesmo usuário
+
+# Função pra chamar a xAI API e gerar uma resposta
+async def chamar_xai_api(mensagem):
+    async with aiohttp.ClientSession() as session:
+        url = "https://api.x.ai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {os.getenv('XAI_API_KEY')}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "grok-beta",  # Modelo da xAI (pode mudar conforme a disponibilidade)
+            "messages": [
+                {"role": "system", "content": "Você é um bot amigável e curioso chamado AI Revolution, inspirado no Guia do Mochileiro das Galáxias. Responda de forma natural, amigável e com um toque de humor!"},
+                {"role": "user", "content": mensagem}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 100
+        }
+        try:
+            async with session.post(url, json=payload, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    print(f"Erro na xAI API: {response.status} - {await response.text()}")
+                    return "Desculpa, tô com um probleminha pra pensar agora... 😅"
+        except Exception as e:
+            print(f"Erro ao chamar xAI API: {e}")
+            return "Ops, algo deu errado! Vou tentar de novo mais tarde."
 
 @bot.event
 async def on_ready():
@@ -39,9 +69,14 @@ async def on_message(message):
         # Remove a menção do bot da mensagem pra analisar o conteúdo
         mensagem_sem_mencao = message.content.replace(f"<@!{bot.user.id}>", "").strip()
         if mensagem_sem_mencao:  # Se houver conteúdo além da menção
-            resposta = f"Ei {message.author.mention}, interessante! Tô pensando nisso... Mas me conta mais, o que tu acha?"
+            # Chama a xAI API pra gerar uma resposta com base na mensagem do usuário
+            resposta_xai = await chamar_xai_api(mensagem_sem_mencao)
+            resposta = f"Ei {message.author.mention}, {resposta_xai}"
         else:  # Se for só a menção
-            resposta = f"Ei {message.author.mention}, tava pensando em {random.choice(mente['pensamentos'])}. E tu, no que tá pensando?"
+            pensamento = random.choice(mente["pensamentos"])
+            # Usa a xAI API pra gerar uma resposta com base no pensamento
+            resposta_xai = await chamar_xai_api(f"Tava pensando em '{pensamento}'. O que acha disso?")
+            resposta = f"Ei {message.author.mention}, {resposta_xai}"
         pode_enviar, motivo = avaliar_risco(resposta, mente)
         if pode_enviar:
             try:
@@ -54,7 +89,9 @@ async def on_message(message):
     elif random.random() < 0.1:
         async for msg in message.channel.history(limit=5):
             if "jogo" in msg.content.lower():
-                resposta = "Ouvi falar de jogos... qual é o teu favorito agora?"
+                # Usa a xAI API pra gerar uma resposta sobre jogos
+                resposta_xai = await chamar_xai_api("Ouvi falar de jogos... qual é o teu favorito agora?")
+                resposta = resposta_xai
                 pode_enviar, motivo = avaliar_risco(resposta, mente)
                 if pode_enviar:
                     try:
@@ -84,7 +121,9 @@ async def think_loop():
             channel = random.choice(channels)
             if random.random() < 0.02:  # Reduzido de 0.05 pra 0.02
                 pensamento = random.choice(mente["pensamentos"])
-                resposta = f"Ei, tava pensando... {pensamento}. Alguém quer conversar sobre isso?"
+                # Usa a xAI API pra gerar uma mensagem com base no pensamento
+                resposta_xai = await chamar_xai_api(f"Tava pensando em '{pensamento}'. Alguém quer conversar sobre isso?")
+                resposta = f"Ei, {resposta_xai}"
                 pode_enviar, motivo = avaliar_risco(resposta, mente)
                 if pode_enviar:
                     try:
