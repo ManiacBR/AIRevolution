@@ -34,8 +34,8 @@ async def chamar_gemini_api(mensagem):
                     "parts": [
                         {
                             "text": (
-                                "Você é um bot amigável e curioso chamado AI Revolution, inspirado no Guia do Mochileiro das Galáxias. "
-                                f"Responda de forma natural, amigável e com um toque de humor! Pergunta: {mensagem}"
+                                "Você é um bot chamado AI Revolution. Responda de forma clara, direta e sem fantasia ou metáforas. "
+                                f"Pergunta: {mensagem}"
                             )
                         }
                     ]
@@ -49,20 +49,19 @@ async def chamar_gemini_api(mensagem):
                     resposta = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                     resposta = resposta.replace(f"<@!{bot.user.id}>", "")
                     falhas_api = 0
-                    # Verificar se a resposta é válida e limitar a 2000 caracteres
                     if not resposta:
-                        return "Desculpa, não consegui pensar em nada legal... 😅"
-                    if len(resposta) > 1900:  # Margem de segurança para menção
-                        resposta = resposta[:1900] + "... (cortado, era muito longo!)"
+                        return "Desculpa, não consegui responder."
+                    if len(resposta) > 1900:
+                        resposta = resposta[:1900] + "... (mensagem cortada, era muito longa)"
                     return resposta
                 else:
                     print(f"Erro na Gemini API: {response.status} - {await response.text()}")
                     falhas_api += 1
-                    return "Desculpa, tô com um probleminha pra pensar agora... 😅"
+                    return "Desculpa, houve um erro ao processar a resposta."
         except Exception as e:
             print(f"Erro ao chamar Gemini API: {e}")
             falhas_api += 1
-            return "Ops, algo deu errado! Vou tentar de novo mais tarde."
+            return "Erro ao tentar responder. Tente novamente mais tarde."
 
 @bot.event
 async def on_ready():
@@ -88,7 +87,7 @@ async def on_message(message):
             resposta = f"Ei {message.author.mention}, {resposta_gemini}"
         else:
             pensamento = random.choice(mente["pensamentos"])
-            resposta_gemini = await chamar_gemini_api(f"Tava pensando em '{pensamento}'. O que acha disso?")
+            resposta_gemini = await chamar_gemini_api(f"Estou pensando em '{pensamento}'. O que você acha disso?")
             resposta = f"Ei {message.author.mention}, {resposta_gemini}"
         
         pode_enviar, motivo = avaliar_risco(resposta, mente, ultima_mensagem_enviada)
@@ -99,7 +98,7 @@ async def on_message(message):
                 ultima_mensagem_enviada = resposta
             except discord.errors.HTTPException as e:
                 print(f"Erro ao enviar mensagem: {e}")
-                await message.channel.send(f"Ei {message.author.mention}, deu um erro ao tentar responder... 😅")
+                await message.channel.send(f"Ei {message.author.mention}, deu um erro ao tentar responder.")
             except discord.errors.Forbidden:
                 print(f"Sem permissão para enviar mensagem no canal {message.channel.name}")
         else:
@@ -110,7 +109,7 @@ async def on_message(message):
             if msg.author == bot.user:
                 continue
             if "jogo" in msg.content.lower():
-                resposta_gemini = await chamar_gemini_api("Ouvi falar de jogos... qual é o teu favorito agora?")
+                resposta_gemini = await chamar_gemini_api("Vi que você mencionou jogos. Qual é o seu favorito agora?")
                 resposta = resposta_gemini
                 pode_enviar, motivo = avaliar_risco(resposta, mente, ultima_mensagem_enviada)
                 if pode_enviar:
@@ -120,7 +119,7 @@ async def on_message(message):
                         ultima_mensagem_enviada = resposta
                     except discord.errors.HTTPException as e:
                         print(f"Erro ao enviar mensagem: {e}")
-                        await message.channel.send("Deu um erro ao falar sobre jogos... 😅")
+                        await message.channel.send("Deu um erro ao falar sobre jogos.")
                     except discord.errors.Forbidden:
                         print(f"Sem permissão para enviar mensagem no canal {message.channel.name}")
                 else:
@@ -148,7 +147,7 @@ async def think_loop():
             channel = random.choice(channels)
             if random.random() < 0.005:
                 pensamento = random.choice(mente["pensamentos"])
-                resposta_gemini = await chamar_gemini_api(f"Tava pensando em '{pensamento}'. Alguém quer conversar sobre isso?")
+                resposta_gemini = await chamar_gemini_api(f"Estou pensando em '{pensamento}'. Alguém quer conversar sobre isso?")
                 resposta = f"Ei, {resposta_gemini}"
                 pode_enviar, motivo = avaliar_risco(resposta, mente, ultima_mensagem_enviada)
                 if pode_enviar:
