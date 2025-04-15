@@ -3,11 +3,12 @@ import time
 import subprocess
 import tempfile
 import requests
+import base64
 from main import chamar_gemini_api, registrar_metrica
 
 CODIGO_PERMITIDO = ["etica.py", "mente.py"]  # main.py não, pra não quebrar o bot
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")  # Adiciona no Render
-REPO = "VerySupimpa/ai-revolution"  # Ajusta pro teu repo
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")  # Já tá no Render
+REPO = "ManiacBR/AIRevolution"  # Teu repo atualizado
 BRANCH = "main"
 
 def testar_codigo(novo_codigo):
@@ -35,7 +36,7 @@ async def sugerir_mudanca_codigo(arquivo, problema, user_id):
         return None, f"Arquivo {arquivo} não encontrado."
     
     prompt = (
-        f"Você é o AI Revolution, criado por VerySupimpa. "
+        f"Você é o AI Revolution, criado por ManiacBR. "
         f"Detectei: {problema}. "
         f"Código atual de {arquivo}:\n```python\n{codigo_atual}\n``` "
         f"Sugira uma nova versão do código pra corrigir o problema. "
@@ -66,7 +67,7 @@ async def commit_github(arquivo, novo_codigo, motivo):
         
         data = response.json()
         sha = data["sha"]
-        content = novo_codigo.encode("base64").decode("utf-8")
+        content = base64.b64encode(novo_codigo.encode()).decode("utf-8")
         
         # Atualiza o arquivo
         payload = {
