@@ -7,6 +7,7 @@ import os
 import aiohttp
 from dotenv import load_dotenv
 from mente import carregar_mente, escolher_interesse, adicionar_conversa, obter_conversas_recentes, adicionar_conhecimento, obter_conhecimentos
+from etica import avaliar_risco  # Import adicionado
 
 load_dotenv()
 intents = discord.Intents.default()
@@ -22,7 +23,6 @@ MAX_FALHAS_API = 3
 ultima_mensagem_enviada = {"texto": "", "timestamp": 0}
 ultima_falha_reset = 0
 
-# Função para determinar o tom da mensagem (adicionada de volta)
 def determinar_tom(mensagem):
     palavras_formais = ["por favor", "obrigado", "necessito", "gostaria", "agradeço"]
     palavras_descontraidas = ["cara", "mano", "valeu", "hehe", "lol"]
@@ -54,7 +54,7 @@ def monitorar_mente_tamanho():
 
 async def chamar_gemini_api(mensagem, user_id):
     global falhas_api, ultima_falha_reset
-    tom = determinar_tom(mensagem)  # Agora a função existe e deve funcionar
+    tom = determinar_tom(mensagem)
     
     if tom == "formal":
         instrucao_tom = (
