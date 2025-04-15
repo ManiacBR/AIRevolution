@@ -324,7 +324,7 @@ async def showcode(ctx, filename: str):
         await ctx.send("Desculpa, só o meu criador pode ver o meu código! 😊")
         return
     
-    allowed_files = ["Main.py", "Mente.py", "Etica.py", "Requirements.txt", ".gitignore"]
+    allowed_files = ["main.py", "mente.py", "etica.py", "requirements.txt", ".gitignore"]
     if filename not in allowed_files:
         await ctx.send(f"Arquivo '{filename}' não encontrado ou não permitido. 🤔")
         return
@@ -349,7 +349,7 @@ async def readcode(ctx, filename: str):
         await ctx.send("Desculpa, só o meu criador pode me pedir pra ler meu próprio código! 😊")
         return
     
-    allowed_files = ["Main.py", "Mente.py", "Etica.py"]
+    allowed_files = ["main.py", "mente.py", "etica.py"]
     if filename not in allowed_files:
         await ctx.send(f"Arquivo '{filename}' não permitido pra leitura. Tenta outro? 🤔")
         return
