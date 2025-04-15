@@ -1,11 +1,9 @@
 import json
-import os
 import random
 import time
+import requests
 from datetime import datetime
 
-# Disco persistente no Render
-MENTE_ARQUIVO = "/opt/render/project/data/mente.json"
 MENTE_PADRAO = {
     "interesses": ["tecnologia", "música", "filosofia", "jogos", "ciência", "arte", "esportes", "culinária", "viagens", "história"],
     "ultima_atualizacao": time.time(),
@@ -19,22 +17,56 @@ MENTE_PADRAO = {
     "ultimos_tons": {}
 }
 
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+REPO = "VerySupimpa/ai-revolution"  # Ajusta se for outro
+MENTE_PATH = "data/mente.json"  # Caminho no repo
+BRANCH = "main"
+
+def github_request(method, endpoint, data=None):
+    """Faz requisições pra API do GitHub."""
+    url = f"https://api.github.com/repos/{REPO}/{endpoint}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    response = requests.request(method, url, headers=headers, json=data)
+    return response
+
 def carregar_mente():
-    os.makedirs(os.path.dirname(MENTE_ARQUIVO), exist_ok=True)
-    if os.path.exists(MENTE_ARQUIVO):
-        print(f"Carregando {MENTE_ARQUIVO}...")
-        with open(MENTE_ARQUIVO, "r") as f:
-            return json.load(f)
+    """Carrega mente.json do GitHub."""
+    response = github_request("GET", f"contents/{MENTE_PATH}")
+    if response.status_code == 200:
+        print(f"Carregando {MENTE_PATH} do GitHub...")
+        data = response.json()
+        content = base64.b64decode(data["content"]).decode("utf-8")
+        return json.loads(content)
     else:
-        print(f"Criando {MENTE_ARQUIVO}...")
-        with open(MENTE_ARQUIVO, "w") as f:
-            json.dump(MENTE_PADRAO, f)
+        print(f"Criando {MENTE_PATH} no GitHub...")
+        # Cria arquivo inicial
+        payload = {
+            "message": "Inicia mente.json",
+            "content": base64.b64encode(json.dumps(MENTE_PADRAO).encode()).decode(),
+            "branch": BRANCH
+        }
+        github_request("PUT", f"contents/{MENTE_PATH}", payload)
         return MENTE_PADRAO
 
 def salvar_mente(mente):
-    print(f"Salvando {MENTE_ARQUIVO}...")
-    with open(MENTE_ARQUIVO, "w") as f:
-        json.dump(mente, f)
+    """Salva mente.json no GitHub."""
+    print(f"Salvando {MENTE_PATH} no GitHub...")
+    # Pega o SHA atual
+    response = github_request("GET", f"contents/{MENTE_PATH}")
+    sha = response.json()["sha"] if response.status_code == 200 else None
+    # Atualiza arquivo
+    payload = {
+        "message": f"Atualiza mente.json em {time.ctime()}",
+        "content": base64.b64encode(json.dumps(mente).encode()).decode(),
+        "branch": BRANCH,
+        "sha": sha
+    }
+    response = github_request("PUT", f"contents/{MENTE_PATH}", payload)
+    if response.status_code not in (200, 201):
+        print(f"Erro ao salvar mente.json: {response.text}")
 
 def escolher_interesse(mente):
     return random.choice(mente["interesses"])
@@ -93,7 +125,6 @@ def obter_conhecimentos(mente, user_id):
     return mente["conhecimentos"].get(user_id, [])
 
 def obter_ultimo_tom(user_id):
-    mente = carregar_mente()
     user_id = str(user_id)
     return mente.get("ultimos_tons", {}).get(user_id, None)
 
