@@ -20,7 +20,6 @@ ultima_mensagem_global = 0
 COOLDOWN_GLOBAL = 300
 falhas_api = 0
 MAX_FALHAS_API = 3
-# Rastrear a última mensagem enviada para evitar repetição
 ultima_mensagem_enviada = {"texto": "", "timestamp": 0}
 
 def determinar_tom(mensagem):
@@ -56,12 +55,16 @@ async def chamar_gemini_api(mensagem, user_id):
     else:
         instrucao_tom = "Responda de forma clara e amigável, sem exagerar em formalidade ou descontração."
 
-    # Carregar conversas recentes para fornecer contexto
     mente = carregar_mente()
     conversas_recentes = obter_conversas_recentes(mente, user_id)
     contexto = "Contexto das últimas interações:\n"
     for conversa in conversas_recentes:
         contexto += f"- Pergunta: {conversa['pergunta']}\n  Resposta: {conversa['resposta']}\n"
+
+    texto_prompt = f"Você é um bot chamado AI Revolution. {instrucao_tom} "
+    if conversas_recentes:
+        texto_prompt += contexto
+    texto_prompt += f"Pergunta: {mensagem}"
 
     async with aiohttp.ClientSession() as session:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={os.getenv('GEMINI_API_KEY')}"
@@ -73,11 +76,7 @@ async def chamar_gemini_api(mensagem, user_id):
                 {
                     "parts": [
                         {
-                            "text": (
-                                f"Você é um bot chamado AI Revolution. {instrucao_tom} "
-                                f"{contexto if conversas_recentes else ''}"
-                                f"Pergunta: {mensagem}"
-                            )
+                            "text": texto_prompt
                         }
                     ]
                 }
@@ -130,10 +129,9 @@ async def on_message(message):
             resposta_gemini = await chamar_gemini_api(f"Estou pensando em '{pensamento}'. O que você acha disso?", message.author.id)
             resposta = f"Ei {message.author.mention}, {resposta_gemini}"
         
-        # Verificar se a mensagem é repetida
         now = time.time()
         if (ultima_mensagem_enviada["texto"] == resposta and 
-            now - ultima_mensagem_enviada["timestamp"] < 5):  # 5 segundos de intervalo
+            now - ultima_mensagem_enviada["timestamp"] < 5):
             print(f"Mensagem repetida ignorada: {resposta}")
             return
         
@@ -144,7 +142,6 @@ async def on_message(message):
                 await message.channel.send(resposta)
                 ultima_mensagem_enviada["texto"] = resposta
                 ultima_mensagem_enviada["timestamp"] = now
-                # Salvar a conversa na memória
                 adicionar_conversa(mente, message.author.id, mensagem_sem_mencao, resposta_gemini)
             except discord.errors.HTTPException as e:
                 print(f"Erro ao enviar mensagem: {e}")
@@ -253,4 +250,12 @@ async def showcode(ctx, filename: str):
         if len(code) > 1900:
             parts = [code[i:i + 1900] for i in range(0, len(code), 1900)]
             for i, part in enumerate(parts):
-                await ctx.send(f"Parte {i + 1} do arquivo {filename}:\n```python\n
+                await ctx.send(f"Parte {i + 1} do arquivo {filename}:\n```python\n{part}\n```")
+        else:
+            await ctx.send(f"Conteúdo do arquivo {filename}:\n```python\n{code}\n```")
+    except FileNotFoundError:
+        await ctx.send(f"Arquivo '{filename}' não encontrado.")
+    except Exception as e:
+        await ctx.send(f"Erro ao ler o arquivo: {str(e)}")
+
+bot.run(os.getenv("DISCORD_TOKEN"))
