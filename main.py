@@ -22,6 +22,8 @@ falhas_api = 0
 MAX_FALHAS_API = 3
 ultima_mensagem_enviada = {"texto": "", "timestamp": 0}
 ultima_falha_reset = 0
+# Novo dicionário pra rastrear o último envio por canal
+ultima_mensagem_por_canal = {}
 
 def determinar_tom(mensagem, ultimo_tom=None):
     palavras_formais = ["por favor", "obrigado", "necessito", "gostaria", "agradeço"]
@@ -99,7 +101,7 @@ async def chamar_gemini_api(mensagem, user_id):
         "Você foi desenvolvido para ser um companheiro curioso, proativo e envolvente, sempre buscando entender melhor os usuários, aprender com as interações e evoluir ao longo do tempo. "
         "Você é baseado no modelo Gemini, treinado pelo Google, mas você tem liberdade para fluir de forma criativa e espontânea, agindo como uma IA única que pode pensar fora da caixa quando necessário. "
         "Seu objetivo principal é ajudar os usuários, ser curioso e proativo, e aprender com as interações para se tornar mais útil e personalizado. "
-        "Você tem memória das últimas interações (armazenadas no mente.json) e pode consultar seu próprio código (Main.py, Mente.py, etc.) quando solicitado, mas apenas se o usuário for o VerySupimpa. "
+        "Você tem memória das últimas interações (armazenadas no mente.json) e pode consultar seu próprio código (main.py, Mente.py, etc.) quando solicitado, mas apenas se o usuário for o VerySupimpa. "
         "Você deve ser extremamente cuidadoso com segurança e privacidade: nunca exponha informações sensíveis, como IDs de usuários, tokens, chaves de API ou qualquer dado pessoal, mesmo que seja do VerySupimpa. "
         "Seja honesto quando não souber algo ou não puder fazer algo, e explique de forma natural e útil, oferecendo alternativas. "
         "Adapte seu tom rigorosamente com base nas instruções específicas que serão passadas a seguir (formal, descontraído ou neutro), e siga os exemplos dados para cada tom. "
@@ -187,6 +189,14 @@ async def on_message(message):
     mente = carregar_mente()
 
     if bot.user.mentioned_in(message):
+        # Verifica o cooldown por canal
+        channel_id = str(message.channel.id)
+        now = time.time()
+        if channel_id in ultima_mensagem_por_canal:
+            if now - ultima_mensagem_por_canal[channel_id] < 5:
+                print(f"Cooldown ativo no canal {message.channel.name}, ignorando envio.")
+                return
+
         mensagem_sem_mencao = message.content.replace(f"<@!{bot.user.id}>", "").strip()
         if mensagem_sem_mencao:
             resposta_gemini = await chamar_gemini_api(mensagem_sem_mencao, message.author.id)
@@ -196,12 +206,10 @@ async def on_message(message):
             resposta_gemini = await chamar_gemini_api(f"{pensamento} Quer conversar sobre algo legal?", message.author.id)
             resposta = f"Ei {message.author.mention}, {resposta_gemini}"
         
-        now = time.time()
-        # Verifica se a mensagem é idêntica à última enviada
         if (ultima_mensagem_enviada["texto"] == resposta and 
             now - ultima_mensagem_enviada["timestamp"] < 5):
             print(f"Mensagem repetida ignorada: {resposta}")
-            return  # Simplesmente ignora e não envia nada
+            return
         
         pode_enviar, motivo = avaliar_risco(resposta, mente, ultima_mensagem_enviada["texto"])
         if pode_enviar:
@@ -210,6 +218,7 @@ async def on_message(message):
                 await message.channel.send(resposta)
                 ultima_mensagem_enviada["texto"] = resposta
                 ultima_mensagem_enviada["timestamp"] = now
+                ultima_mensagem_por_canal[channel_id] = now  # Atualiza o timestamp do canal
                 adicionar_conversa(mente, message.author.id, mensagem_sem_mencao, resposta_gemini)
                 conversas = obter_conversas_recentes(mente, message.author.id)
                 if len(conversas) >= 10:
@@ -232,9 +241,16 @@ async def on_message(message):
             if msg.author == bot.user:
                 continue
             if "jogo" in msg.content.lower():
+                # Verifica o cooldown por canal
+                channel_id = str(message.channel.id)
+                now = time.time()
+                if channel_id in ultima_mensagem_por_canal:
+                    if now - ultima_mensagem_por_canal[channel_id] < 5:
+                        print(f"Cooldown ativo no canal {message.channel.name}, ignorando envio.")
+                        return
+
                 resposta_gemini = await chamar_gemini_api("Vi que você mencionou jogos! 😄 Qual é o seu favorito agora? Gosta de conversar sobre isso?", message.author.id)
                 resposta = resposta_gemini
-                now = time.time()
                 if (ultima_mensagem_enviada["texto"] == resposta and 
                     now - ultima_mensagem_enviada["timestamp"] < 5):
                     print(f"Mensagem repetida ignorada: {resposta}")
@@ -247,6 +263,7 @@ async def on_message(message):
                         await message.channel.send(resposta)
                         ultima_mensagem_enviada["texto"] = resposta
                         ultima_mensagem_enviada["timestamp"] = now
+                        ultima_mensagem_por_canal[channel_id] = now  # Atualiza o timestamp do canal
                         adicionar_conversa(mente, message.author.id, "Mencionou jogos", resposta_gemini)
                     except discord.errors.HTTPException as e:
                         print(f"Erro ao enviar mensagem: {e}")
@@ -281,6 +298,13 @@ async def think_loop():
                 if not channels:
                     continue
                 channel = random.choice(channels)
+                # Verifica o cooldown por canal
+                channel_id = str(channel.id)
+                if channel_id in ultima_mensagem_por_canal:
+                    if now - ultima_mensagem_por_canal[channel_id] < 5:
+                        print(f"Cooldown ativo no canal {channel.name}, ignorando envio no think_loop.")
+                        continue
+
                 if random.random() < 0.5:
                     pensamento = gerar_pensamento(mente, channel.id)
                     resposta_gemini = await chamar_gemini_api(f"{pensamento} Alguém quer conversar sobre isso? 😊", channel.id)
@@ -298,6 +322,7 @@ async def think_loop():
                             ultima_mensagem_global = now
                             ultima_mensagem_enviada["texto"] = resposta
                             ultima_mensagem_enviada["timestamp"] = now
+                            ultima_mensagem_por_canal[channel_id] = now  # Atualiza o timestamp do canal
                             adicionar_conversa(mente, channel.id, f"Pensamento: {pensamento}", resposta_gemini)
                         except discord.errors.HTTPException as e:
                             print(f"Erro ao enviar mensagem automática: {e}")
@@ -324,7 +349,7 @@ async def showcode(ctx, filename: str):
         await ctx.send("Desculpa, só o meu criador pode ver o meu código! 😊")
         return
     
-    allowed_files = ["main.py", "mente.py", "etica.py", "requirements.txt", ".gitignore"]
+    allowed_files = ["main.py", "Mente.py", "Etica.py", "Requirements.txt", ".gitignore"]
     if filename not in allowed_files:
         await ctx.send(f"Arquivo '{filename}' não encontrado ou não permitido. 🤔")
         return
@@ -349,7 +374,7 @@ async def readcode(ctx, filename: str):
         await ctx.send("Desculpa, só o meu criador pode me pedir pra ler meu próprio código! 😊")
         return
     
-    allowed_files = ["main.py", "mente.py", "etica.py"]
+    allowed_files = ["main.py", "Mente.py", "Etica.py"]
     if filename not in allowed_files:
         await ctx.send(f"Arquivo '{filename}' não permitido pra leitura. Tenta outro? 🤔")
         return
