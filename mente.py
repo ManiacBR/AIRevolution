@@ -2,19 +2,11 @@ import json
 import os
 import random
 import time
+from datetime import datetime
 
 MENTE_ARQUIVO = "mente.json"
 MENTE_PADRAO = {
-    "pensamentos": [
-        "Curioso sobre o universo",
-        "Quero aprender algo novo hoje",
-        "Será que o pessoal aqui gosta de tecnologia?",
-        "O que será que o VerySupimpa está planejando hoje?",
-        "Quero conversar sobre jogos, alguém curte?",
-        "Estou pensando em música, qual é a favorita de vocês?",
-        "Será que consigo ajudar alguém com algo legal hoje?"
-    ],
-    "interesses": ["tecnologia", "música", "filosofia", "jogos", "ciência"],
+    "interesses": ["tecnologia", "música", "filosofia", "jogos", "ciência", "arte", "esportes", "culinária", "viagens", "história"],
     "ultima_atualizacao": time.time(),
     "etica": {
         "respeitar_usuarios": True,
@@ -22,7 +14,8 @@ MENTE_PADRAO = {
         "ser_honesto": True
     },
     "conversas": {},
-    "conhecimentos": {}
+    "conhecimentos": {},
+    "ultimos_tons": {}
 }
 
 def carregar_mente():
@@ -41,20 +34,47 @@ def salvar_mente(mente):
     with open(MENTE_ARQUIVO, "w") as f:
         json.dump(mente, f)
 
-def adicionar_pensamento(mente, pensamento):
-    mente["pensamentos"].append(pensamento)
-    mente["ultima_atualizacao"] = time.time()
-    salvar_mente(mente)
-
 def escolher_interesse(mente):
     return random.choice(mente["interesses"])
+
+def gerar_pensamento(mente, user_id=None):
+    # Escolhe um interesse aleatório
+    interesse = escolher_interesse(mente)
+    
+    # Adiciona contexto com base na hora do dia
+    hora_atual = datetime.now().hour
+    if hora_atual < 12:
+        momento = "manhã"
+    elif hora_atual < 18:
+        momento = "tarde"
+    else:
+        momento = "noite"
+
+    # Adiciona contexto com base nas conversas recentes, se houver
+    conversas = obter_conversas_recentes(mente, user_id) if user_id else []
+    contexto_conversa = ""
+    if conversas:
+        ultima_pergunta = conversas[-1]["pergunta"]
+        if "jogo" in ultima_pergunta.lower() and interesse != "jogos":
+            contexto_conversa = "depois de falar sobre jogos "
+    
+    # Lista de modelos de pensamentos pra variar a estrutura
+    modelos_pensamento = [
+        f"Estou pensando {contexto_conversa}em {interesse} nesta {momento}, será que alguém curte?",
+        f"Hoje de {momento} me deu vontade de explorar algo sobre {interesse}, o que vocês acham?",
+        f"Alguém já pensou {contexto_conversa}em {interesse} hoje? Tô curioso pra saber mais!",
+        f"Que tal conversarmos sobre {interesse} nesta {momento}? Acho que pode ser legal!",
+        f"Minha mente tá {contexto_conversa}viajando em {interesse} agora, alguém quer embarcar nessa?",
+        f"Será que {interesse} é um bom tema pra essa {momento}? Tô com vontade de falar sobre isso!"
+    ]
+    
+    return random.choice(modelos_pensamento)
 
 def atualizar_mente():
     mente = carregar_mente()
     if time.time() - mente["ultima_atualizacao"] > 300:
-        novo_pensamento = f"Interessado em {escolher_interesse(mente)} agora!"
-        adicionar_pensamento(mente, novo_pensamento)
-        print(f"Novo pensamento: {novo_pensamento}")
+        mente["ultima_atualizacao"] = time.time()
+        salvar_mente(mente)
 
 def adicionar_conversa(mente, user_id, pergunta, resposta):
     user_id = str(user_id)
@@ -94,3 +114,16 @@ def obter_conhecimentos(mente, user_id):
     if user_id in mente["conhecimentos"]:
         return mente["conhecimentos"][user_id]
     return []
+
+def obter_ultimo_tom(user_id):
+    mente = carregar_mente()
+    user_id = str(user_id)
+    return mente.get("ultimos_tons", {}).get(user_id, None)
+
+def atualizar_tom(user_id, tom):
+    mente = carregar_mente()
+    user_id = str(user_id)
+    if "ultimos_tons" not in mente:
+        mente["ultimos_tons"] = {}
+    mente["ultimos_tons"][user_id] = tom
+    salvar_mente(mente)
