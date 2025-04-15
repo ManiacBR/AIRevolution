@@ -4,7 +4,8 @@ import random
 import time
 from datetime import datetime
 
-MENTE_ARQUIVO = "mente.json"
+# Disco persistente no Render
+MENTE_ARQUIVO = "/opt/render/project/data/mente.json"
 MENTE_PADRAO = {
     "interesses": ["tecnologia", "música", "filosofia", "jogos", "ciência", "arte", "esportes", "culinária", "viagens", "história"],
     "ultima_atualizacao": time.time(),
@@ -19,18 +20,19 @@ MENTE_PADRAO = {
 }
 
 def carregar_mente():
+    os.makedirs(os.path.dirname(MENTE_ARQUIVO), exist_ok=True)
     if os.path.exists(MENTE_ARQUIVO):
-        print(f"Carregando mente.json existente: {MENTE_ARQUIVO}")
+        print(f"Carregando {MENTE_ARQUIVO}...")
         with open(MENTE_ARQUIVO, "r") as f:
             return json.load(f)
     else:
-        print(f"mente.json não encontrado, criando novo arquivo: {MENTE_ARQUIVO}")
+        print(f"Criando {MENTE_ARQUIVO}...")
         with open(MENTE_ARQUIVO, "w") as f:
             json.dump(MENTE_PADRAO, f)
         return MENTE_PADRAO
 
 def salvar_mente(mente):
-    print(f"Salvando mente.json: {MENTE_ARQUIVO}")
+    print(f"Salvando {MENTE_ARQUIVO}...")
     with open(MENTE_ARQUIVO, "w") as f:
         json.dump(mente, f)
 
@@ -38,36 +40,20 @@ def escolher_interesse(mente):
     return random.choice(mente["interesses"])
 
 def gerar_pensamento(mente, user_id=None):
-    # Escolhe um interesse aleatório
     interesse = escolher_interesse(mente)
-    
-    # Adiciona contexto com base na hora do dia
     hora_atual = datetime.now().hour
-    if hora_atual < 12:
-        momento = "manhã"
-    elif hora_atual < 18:
-        momento = "tarde"
-    else:
-        momento = "noite"
-
-    # Adiciona contexto com base nas conversas recentes, se houver
+    momento = "manhã" if hora_atual < 12 else "tarde" if hora_atual < 18 else "noite"
     conversas = obter_conversas_recentes(mente, user_id) if user_id else []
     contexto_conversa = ""
     if conversas:
         ultima_pergunta = conversas[-1]["pergunta"]
         if "jogo" in ultima_pergunta.lower() and interesse != "jogos":
             contexto_conversa = "depois de falar sobre jogos "
-    
-    # Lista de modelos de pensamentos pra variar a estrutura
     modelos_pensamento = [
         f"Estou pensando {contexto_conversa}em {interesse} nesta {momento}, será que alguém curte?",
         f"Hoje de {momento} me deu vontade de explorar algo sobre {interesse}, o que vocês acham?",
-        f"Alguém já pensou {contexto_conversa}em {interesse} hoje? Tô curioso pra saber mais!",
-        f"Que tal conversarmos sobre {interesse} nesta {momento}? Acho que pode ser legal!",
-        f"Minha mente tá {contexto_conversa}viajando em {interesse} agora, alguém quer embarcar nessa?",
-        f"Será que {interesse} é um bom tema pra essa {momento}? Tô com vontade de falar sobre isso!"
+        f"Alguém já pensou {contexto_conversa}em {interesse} hoje? Tô curioso pra saber mais!"
     ]
-    
     return random.choice(modelos_pensamento)
 
 def atualizar_mente():
@@ -80,40 +66,31 @@ def adicionar_conversa(mente, user_id, pergunta, resposta):
     user_id = str(user_id)
     if user_id not in mente["conversas"]:
         mente["conversas"][user_id] = []
-    
     mente["conversas"][user_id].append({
         "pergunta": pergunta[:100],
         "resposta": resposta[:100],
         "timestamp": time.time()
     })
-    
     if len(mente["conversas"][user_id]) > 10:
         mente["conversas"][user_id] = mente["conversas"][user_id][-10:]
-    
     salvar_mente(mente)
 
 def obter_conversas_recentes(mente, user_id):
     user_id = str(user_id)
-    if user_id in mente["conversas"]:
-        return mente["conversas"][user_id]
-    return []
+    return mente["conversas"].get(user_id, [])
 
 def adicionar_conhecimento(mente, user_id, conhecimento):
     user_id = str(user_id)
     if user_id not in mente["conhecimentos"]:
         mente["conhecimentos"][user_id] = []
-    
     mente["conhecimentos"][user_id].append(conhecimento)
     if len(mente["conhecimentos"][user_id]) > 5:
         mente["conhecimentos"][user_id] = mente["conhecimentos"][user_id][-5:]
-    
     salvar_mente(mente)
 
 def obter_conhecimentos(mente, user_id):
     user_id = str(user_id)
-    if user_id in mente["conhecimentos"]:
-        return mente["conhecimentos"][user_id]
-    return []
+    return mente["conhecimentos"].get(user_id, [])
 
 def obter_ultimo_tom(user_id):
     mente = carregar_mente()
