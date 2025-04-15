@@ -49,7 +49,12 @@ async def chamar_gemini_api(mensagem):
                     resposta = data["candidates"][0]["content"]["parts"][0]["text"].strip()
                     resposta = resposta.replace(f"<@!{bot.user.id}>", "")
                     falhas_api = 0
-                    return resposta if resposta else "Desculpa, não consegui pensar em nada legal... 😅"
+                    # Verificar se a resposta é válida e limitar a 2000 caracteres
+                    if not resposta:
+                        return "Desculpa, não consegui pensar em nada legal... 😅"
+                    if len(resposta) > 1900:  # Margem de segurança para menção
+                        resposta = resposta[:1900] + "... (cortado, era muito longo!)"
+                    return resposta
                 else:
                     print(f"Erro na Gemini API: {response.status} - {await response.text()}")
                     falhas_api += 1
@@ -92,6 +97,9 @@ async def on_message(message):
                 print(f"Enviando resposta para menção: {resposta}")
                 await message.channel.send(resposta)
                 ultima_mensagem_enviada = resposta
+            except discord.errors.HTTPException as e:
+                print(f"Erro ao enviar mensagem: {e}")
+                await message.channel.send(f"Ei {message.author.mention}, deu um erro ao tentar responder... 😅")
             except discord.errors.Forbidden:
                 print(f"Sem permissão para enviar mensagem no canal {message.channel.name}")
         else:
@@ -110,6 +118,9 @@ async def on_message(message):
                         print(f"Enviando resposta sobre jogos: {resposta}")
                         await message.channel.send(resposta)
                         ultima_mensagem_enviada = resposta
+                    except discord.errors.HTTPException as e:
+                        print(f"Erro ao enviar mensagem: {e}")
+                        await message.channel.send("Deu um erro ao falar sobre jogos... 😅")
                     except discord.errors.Forbidden:
                         print(f"Sem permissão para enviar mensagem no canal {message.channel.name}")
                 else:
@@ -146,8 +157,10 @@ async def think_loop():
                         await channel.send(resposta)
                         ultima_mensagem_global = now
                         ultima_mensagem_enviada = resposta
+                    except discord.errors.HTTPException as e:
+                        print(f"Erro ao enviar mensagem automática: {e}")
                     except discord.errors.Forbidden:
-                        print(f"Sem permissão para enviar mensagem no canal {message.channel.name}")
+                        print(f"Sem permissão para enviar mensagem no canal {channel.name}")
                 else:
                     print(f"Não enviado (think_loop): {motivo}")
         await asyncio.sleep(60)
