@@ -21,7 +21,8 @@ MENTE_PADRAO = {
         "evitar_spam": True,
         "ser_honesto": True
     },
-    "conversas": {}
+    "conversas": {},
+    "conhecimentos": {}
 }
 
 def carregar_mente():
@@ -66,7 +67,7 @@ def adicionar_conversa(mente, user_id, pergunta, resposta):
         "timestamp": time.time()
     })
     
-    if len(mente["conversas"][user_id]) > 10:  # Aumentei de 5 pra 10
+    if len(mente["conversas"][user_id]) > 10:
         mente["conversas"][user_id] = mente["conversas"][user_id][-10:]
     
     salvar_mente(mente)
@@ -75,4 +76,21 @@ def obter_conversas_recentes(mente, user_id):
     user_id = str(user_id)
     if user_id in mente["conversas"]:
         return mente["conversas"][user_id]
+    return []
+
+def adicionar_conhecimento(mente, user_id, conhecimento):
+    user_id = str(user_id)
+    if user_id not in mente["conhecimentos"]:
+        mente["conhecimentos"][user_id] = []
+    
+    mente["conhecimentos"][user_id].append(conhecimento)
+    if len(mente["conhecimentos"][user_id]) > 5:
+        mente["conhecimentos"][user_id] = mente["conhecimentos"][user_id][-5:]
+    
+    salvar_mente(mente)
+
+def obter_conhecimentos(mente, user_id):
+    user_id = str(user_id)
+    if user_id in mente["conhecimentos"]:
+        return mente["conhecimentos"][user_id]
     return []
