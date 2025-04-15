@@ -5,8 +5,16 @@ import time
 
 MENTE_ARQUIVO = "mente.json"
 MENTE_PADRAO = {
-    "pensamentos": ["Curioso sobre o universo", "Quero aprender algo novo hoje"],
-    "interesses": ["tecnologia", "música", "filosofia"],
+    "pensamentos": [
+        "Curioso sobre o universo",
+        "Quero aprender algo novo hoje",
+        "Será que o pessoal aqui gosta de tecnologia?",
+        "O que será que o VerySupimpa está planejando hoje?",
+        "Quero conversar sobre jogos, alguém curte?",
+        "Estou pensando em música, qual é a favorita de vocês?",
+        "Será que consigo ajudar alguém com algo legal hoje?"
+    ],
+    "interesses": ["tecnologia", "música", "filosofia", "jogos", "ciência"],
     "ultima_atualizacao": time.time(),
     "etica": {
         "respeitar_usuarios": True,
@@ -58,8 +66,8 @@ def adicionar_conversa(mente, user_id, pergunta, resposta):
         "timestamp": time.time()
     })
     
-    if len(mente["conversas"][user_id]) > 5:
-        mente["conversas"][user_id] = mente["conversas"][user_id][-5:]
+    if len(mente["conversas"][user_id]) > 10:  # Aumentei de 5 pra 10
+        mente["conversas"][user_id] = mente["conversas"][user_id][-10:]
     
     salvar_mente(mente)
 
