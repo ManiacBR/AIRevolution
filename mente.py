@@ -2,6 +2,8 @@ import json
 import random
 import time
 import requests
+import base64
+import os  # Adicionado pra corrigir o erro
 from datetime import datetime
 
 MENTE_PADRAO = {
@@ -18,7 +20,7 @@ MENTE_PADRAO = {
 }
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-REPO = "VerySupimpa/ai-revolution"  # Ajusta se for outro
+REPO = "ManiacBR/AIRevolution"  # Teu repo
 MENTE_PATH = "data/mente.json"  # Caminho no repo
 BRANCH = "main"
 
@@ -61,9 +63,10 @@ def salvar_mente(mente):
     payload = {
         "message": f"Atualiza mente.json em {time.ctime()}",
         "content": base64.b64encode(json.dumps(mente).encode()).decode(),
-        "branch": BRANCH,
-        "sha": sha
+        "branch": BRANCH
     }
+    if sha:
+        payload["sha"] = sha
     response = github_request("PUT", f"contents/{MENTE_PATH}", payload)
     if response.status_code not in (200, 201):
         print(f"Erro ao salvar mente.json: {response.text}")
