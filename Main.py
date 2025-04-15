@@ -197,10 +197,11 @@ async def on_message(message):
             resposta = f"Ei {message.author.mention}, {resposta_gemini}"
         
         now = time.time()
+        # Verifica se a mensagem é idêntica à última enviada
         if (ultima_mensagem_enviada["texto"] == resposta and 
             now - ultima_mensagem_enviada["timestamp"] < 5):
             print(f"Mensagem repetida ignorada: {resposta}")
-            return
+            return  # Simplesmente ignora e não envia nada
         
         pode_enviar, motivo = avaliar_risco(resposta, mente, ultima_mensagem_enviada["texto"])
         if pode_enviar:
