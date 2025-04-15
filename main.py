@@ -22,6 +22,29 @@ MAX_FALHAS_API = 3
 ultima_mensagem_enviada = {"texto": "", "timestamp": 0}
 ultima_falha_reset = 0
 
+# Função para determinar o tom da mensagem (adicionada de volta)
+def determinar_tom(mensagem):
+    palavras_formais = ["por favor", "obrigado", "necessito", "gostaria", "agradeço"]
+    palavras_descontraidas = ["cara", "mano", "valeu", "hehe", "lol"]
+    tem_emoji = any(ord(char) > 127 for char in mensagem)
+
+    mensagem_lower = mensagem.lower()
+    formal_score = sum(1 for palavra in palavras_formais if palavra in mensagem_lower)
+    descontraido_score = sum(1 for palavra in palavras_descontraidas if palavra in mensagem_lower)
+    if tem_emoji:
+        descontraido_score += 1
+    if len(mensagem) > 100:
+        formal_score += 1
+    elif len(mensagem) < 20:
+        descontraido_score += 1
+
+    if formal_score > descontraido_score:
+        return "formal"
+    elif descontraido_score > formal_score:
+        return "descontraido"
+    else:
+        return "neutro"
+
 def monitorar_mente_tamanho():
     if os.path.exists("mente.json"):
         tamanho = os.path.getsize("mente.json") / 1024
@@ -31,7 +54,7 @@ def monitorar_mente_tamanho():
 
 async def chamar_gemini_api(mensagem, user_id):
     global falhas_api, ultima_falha_reset
-    tom = determinar_tom(mensagem)
+    tom = determinar_tom(mensagem)  # Agora a função existe e deve funcionar
     
     if tom == "formal":
         instrucao_tom = (
