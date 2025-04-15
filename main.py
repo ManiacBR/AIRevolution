@@ -6,8 +6,8 @@ import time
 import os
 import aiohttp
 from dotenv import load_dotenv
-from mente import carregar_mente, escolher_interesse, adicionar_conversa, obter_conversas_recentes, adicionar_conhecimento, obter_conhecimentos
-from etica import avaliar_risco  # Import adicionado
+from mente import carregar_mente, escolher_interesse, adicionar_conversa, obter_conversas_recentes, adicionar_conhecimento, obter_conhecimentos, obter_ultimo_tom, atualizar_tom, gerar_pensamento
+from etica import avaliar_risco
 
 load_dotenv()
 intents = discord.Intents.default()
@@ -23,7 +23,7 @@ MAX_FALHAS_API = 3
 ultima_mensagem_enviada = {"texto": "", "timestamp": 0}
 ultima_falha_reset = 0
 
-def determinar_tom(mensagem):
+def determinar_tom(mensagem, ultimo_tom=None):
     palavras_formais = ["por favor", "obrigado", "necessito", "gostaria", "agradeço"]
     palavras_descontraidas = ["cara", "mano", "valeu", "hehe", "lol"]
     tem_emoji = any(ord(char) > 127 for char in mensagem)
@@ -37,6 +37,12 @@ def determinar_tom(mensagem):
         formal_score += 1
     elif len(mensagem) < 20:
         descontraido_score += 1
+
+    if ultimo_tom:
+        if ultimo_tom == "formal":
+            formal_score += 2
+        elif ultimo_tom == "descontraido":
+            descontraido_score += 2
 
     if formal_score > descontraido_score:
         return "formal"
@@ -54,7 +60,9 @@ def monitorar_mente_tamanho():
 
 async def chamar_gemini_api(mensagem, user_id):
     global falhas_api, ultima_falha_reset
-    tom = determinar_tom(mensagem)
+    ultimo_tom = obter_ultimo_tom(user_id)
+    tom = determinar_tom(mensagem, ultimo_tom)
+    atualizar_tom(user_id, tom)
     
     if tom == "formal":
         instrucao_tom = (
@@ -184,8 +192,8 @@ async def on_message(message):
             resposta_gemini = await chamar_gemini_api(mensagem_sem_mencao, message.author.id)
             resposta = f"Ei {message.author.mention}, {resposta_gemini}"
         else:
-            pensamento = random.choice(mente["pensamentos"])
-            resposta_gemini = await chamar_gemini_api(f"Estou pensando em '{pensamento}'. O que você acha disso? Quer conversar sobre algo legal?", message.author.id)
+            pensamento = gerar_pensamento(mente, message.author.id)
+            resposta_gemini = await chamar_gemini_api(f"{pensamento} Quer conversar sobre algo legal?", message.author.id)
             resposta = f"Ei {message.author.mention}, {resposta_gemini}"
         
         now = time.time()
@@ -273,8 +281,8 @@ async def think_loop():
                     continue
                 channel = random.choice(channels)
                 if random.random() < 0.5:
-                    pensamento = random.choice(mente["pensamentos"])
-                    resposta_gemini = await chamar_gemini_api(f"Estou pensando em '{pensamento}'. Alguém quer conversar sobre isso? 😊", channel.id)
+                    pensamento = gerar_pensamento(mente, channel.id)
+                    resposta_gemini = await chamar_gemini_api(f"{pensamento} Alguém quer conversar sobre isso? 😊", channel.id)
                     resposta = f"Ei, {resposta_gemini}"
                     if (ultima_mensagem_enviada["texto"] == resposta and 
                         now - ultima_mensagem_enviada["timestamp"] < 5):
