@@ -22,15 +22,20 @@ class VoiceHandler:
                 return f"Erro na transcrição: {str(e)}"
 
     def speak(self, text):
-        self.engine.say(text)
-        self.engine.runAndWait()
+        try:
+            self.engine.say(text)
+            self.engine.runAndWait()
+        except Exception as e:
+            print(f"Erro ao falar: {str(e)}")
 
     async def handle_voice_interaction(self, voice_client, ai, channel):
         while voice_client.is_connected():
             try:
                 user_input = await self.listen(voice_client)
                 if user_input:
-                    if user_input.lower().startswith("sair") or "sai da voz" in user_input.lower():
+                    user_input_lower = user_input.lower()
+                    # Verifica variações do comando sair
+                    if any(phrase in user_input_lower for phrase in ["sair", "sai da voz", "sai da vos", "sair da voz"]):
                         await voice_client.disconnect()
                         await channel.send("Desconectado do canal de voz!")
                         break
