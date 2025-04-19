@@ -1,5 +1,0 @@
-.env
-mente.json
-__pycache__/
-*.pyc
-/opt/render/project/data/
