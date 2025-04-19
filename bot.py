@@ -17,7 +17,7 @@ async def on_ready():
 # Função para gerar resposta da OpenAI
 async def generate_openai_response(prompt):
     response = openai.Completion.create(
-        model="gpt-4.1",  # Usando o modelo GPT-4.1
+        model="gpt-4.1-2025-04-14",  # Usando o modelo GPT-4.1
         prompt=prompt,
         max_tokens=100
     )
