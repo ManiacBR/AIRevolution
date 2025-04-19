@@ -2,101 +2,62 @@ import discord
 import openai
 import json
 import os
-
-from openai import OpenAIError
-from discord.ext import commands
-
-# Token de segurança
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-openai.api_key = OPENAI_API_KEY
-client_openai = openai.OpenAI()
+from datetime import datetime
 
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
+client = discord.Client(intents=intents)
 
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-# Limite total de tokens
-MAX_INPUT_TOKENS = 950000
-MAX_OUTPUT_TOKENS = 950000
-
-total_input_tokens = 0
-total_output_tokens = 0
-
-# Memória
+openai.api_key = os.getenv("OPENAI_API_KEY")
+MODEL = "gpt-4_1-2025-04-14"
 MEMORY_FILE = "memory.json"
-if os.path.exists(MEMORY_FILE):
-    with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-        memory = json.load(f)
-else:
-    memory = []
 
-def save_memory():
+# Carrega a memória se existir
+def load_memory():
+    if os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+# Salva a memória
+def save_memory(memory):
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(memory, f, indent=2, ensure_ascii=False)
+        json.dump(memory, f, indent=2)
 
-async def generate_openai_response(prompt):
-    global total_input_tokens, total_output_tokens
-
-    messages = memory[-20:] + [{"role": "user", "content": prompt}]
-
+# Gera resposta com o modelo correto
+async def generate_openai_response(memory, user_message):
+    messages = memory + [{"role": "user", "content": user_message}]
     try:
-        response = client_openai.chat.completions.create(
-            model="o4-mini-2025-04-16",
+        response = openai.chat.completions.create(
+            model=MODEL,
             messages=messages,
-            max_completion_tokens=500,
             temperature=0.7,
+            max_tokens=1024
         )
-        reply = response.choices[0].message.content.strip()
-        total_input_tokens += response.usage.prompt_tokens
-        total_output_tokens += response.usage.completion_tokens
-        return reply
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Erro ao gerar resposta: {e}"
 
-    except OpenAIError as e:
-        print(f"[Erro o4-mini] {e}")
-
-        try:
-            response = client_openai.chat.completions.create(
-                model="gpt-4-1106-preview",
-                messages=messages,
-                max_tokens=500,
-                temperature=0.7,
-            )
-            reply = response.choices[0].message.content.strip()
-            total_input_tokens += response.usage.prompt_tokens
-            total_output_tokens += response.usage.completion_tokens
-            return reply
-        except Exception as fallback_error:
-            return f"Erro ao gerar resposta: {fallback_error}"
-
-@bot.event
+@client.event
 async def on_ready():
-    print(f'Bot conectado como {bot.user}!')
+    print(f"Logado como {client.user.name}")
 
-@bot.event
+@client.event
 async def on_message(message):
-    if message.author.bot:
+    if message.author == client.user or message.channel.type.name != "text":
         return
 
-    content = message.content.lower()
-    mentioned = bot.user in message.mentions
-    has_name = bot.user.name.lower() in content
+    memory = load_memory()
 
-    if mentioned or has_name:
-        prompt = message.content.replace(f"<@{bot.user.id}>", "").strip()
-        
-        if "quantos tokens" in prompt:
-            await message.channel.send(f"Uso atual:\nInput: {total_input_tokens} / 950000\nOutput: {total_output_tokens} / 950000")
-            return
+    user_input = message.content
+    memory.append({"role": "user", "content": user_input})
 
-        response = await generate_openai_response(prompt)
-        memory.append({"role": "user", "content": prompt})
-        memory.append({"role": "assistant", "content": response})
-        save_memory()
+    response = await generate_openai_response(memory, user_input)
+    memory.append({"role": "assistant", "content": response})
 
-        await message.channel.send(response)
+    save_memory(memory)
 
-bot.run(DISCORD_TOKEN)
+    await message.channel.send(response)
+
+client.run(os.getenv("DISCORD_BOT_TOKEN"))
