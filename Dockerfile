@@ -1,9 +1,10 @@
 # Usa a imagem base do Python
 FROM python:3.12-slim
 
-# Instala dependências do sistema (libespeak)
+# Instala dependências do sistema (libespeak e portaudio para PyAudio)
 RUN apt-get update && apt-get install -y \
     libespeak1 \
+    portaudio19-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Define o diretório de trabalho
