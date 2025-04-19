@@ -1,45 +1,32 @@
 import speech_recognition as sr
 import pyttsx3
-import discord
-from discord.ext import audiorec
 import asyncio
 import logging
-import io
+import discord
 import wave
+import io
 
-# Configura logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('bot.log'),
-        logging.StreamHandler()
-    ]
-)
 logger = logging.getLogger(__name__)
 
 class VoiceHandler:
     def __init__(self, db):
         logger.info("Inicializando VoiceHandler")
         self.db = db
-        try:
-            self.recognizer = sr.Recognizer()
-            self.engine = pyttsx3.init()
-        except Exception as e:
-            logger.error(f"Erro ao inicializar VoiceHandler: {str(e)}")
-            raise
+        self.recognizer = sr.Recognizer()
+        self.engine = pyttsx3.init()
 
-    def speak(self, text):
-        logger.info(f"Falando: {text}")
-        try:
-            self.engine.say(text)
-            self.engine.runAndWait()
-        except Exception as e:
-            logger.error(f"Erro ao falar: {str(e)}")
+    def speak(self, text, filename="response.wav"):
+        logger.info(f"Gerando fala: {text}")
+        self.engine.save_to_file(text, filename)
+        self.engine.runAndWait()
+        return filename
 
-    async def listen(self, voice_client, timeout=15):
-        logger.info("Iniciando escuta de áudio via Discord")
+    async def handle_voice_interaction(self, voice_client, ai, text_channel):
+        logger.info("Iniciando interação de voz simulada (sem gravação)")
         try:
-            sink = audiorec.sinks.WaveSink()
-            voice_client.start_recording(sink, self.callback, None)
-            await asyncio.sleep(timeout)
+            await text_channel.send("A interação de voz está ativa! (Mas a gravação ainda não está implementada)")
+            await asyncio.sleep(10)
+            await text_channel.send("Encerrando interação simulada de voz.")
+            await voice_client.disconnect()
+        except Exception as e:
+            logger.error(f"Erro durante interação de voz: {str(e)}")
