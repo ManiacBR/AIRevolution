@@ -1,6 +1,7 @@
 import speech_recognition as sr
 import pyttsx3
 import discord
+from discord.ext import audiorec
 import asyncio
 import logging
 import io
@@ -39,7 +40,7 @@ class VoiceHandler:
     async def listen(self, voice_client, timeout=15):
         logger.info("Iniciando escuta de áudio via Discord")
         try:
-            sink = discord.sinks.WaveSink()
+            sink = audiorec.sinks.WaveSink()
             voice_client.start_recording(sink, self.callback, None)
             await asyncio.sleep(timeout)
             voice_client.stop_recording()
@@ -60,10 +61,10 @@ class VoiceHandler:
             return None
         except sr.RequestError as e:
             logger.error(f"Erro na transcrição: {str(e)}")
-            return f"Erro na transcrição: {str(e)}"
+            return None  # Não envia erro ao canal
         except Exception as e:
             logger.error(f"Erro inesperado na escuta: {str(e)}")
-            return f"Erro na escuta: {str(e)}"
+            return None  # Não envia erro ao canal
 
     async def callback(self, sink, *args):
         logger.info("Callback de gravação chamado")
@@ -94,6 +95,6 @@ class VoiceHandler:
                     await channel.send(response)
                     self.speak(response)
             except Exception as e:
-                logger.error(f"Erro na interação por voz: {str(e)}")
-                await channel.send(f"Erro na interação por voz: {str(e)}")
+                logger.error(f"Erro crítico na interação por voz: {str(e)}")
+                await channel.send(f"Erro crítico na interação por voz: {str(e)}")
                 break
