@@ -29,8 +29,8 @@ async def on_message(message):
     content = message.content.lower()
     ctx = await bot.get_context(message)
 
-    # Processa comandos sem prefixo
-    if content.startswith("limpar"):
+    # Processa comandos sem prefixo primeiro
+    if content.startswith("limpar") or "limpa o chat" in content:
         if ctx.author.guild_permissions.manage_messages:
             try:
                 limit = 100
@@ -43,7 +43,7 @@ async def on_message(message):
         else:
             await ctx.send("Você precisa de permissão para gerenciar mensagens.")
         return  # Impede a IA de responder
-    elif content.startswith("apagar"):
+    elif content.startswith("apagar") or "apaga essa" in content:
         if ctx.author.guild_permissions.manage_messages:
             try:
                 if message.reference:
@@ -73,14 +73,14 @@ async def on_message(message):
         else:
             await ctx.send("Você precisa estar em um canal de voz!")
         return  # Impede a IA de responder
-    elif content.startswith("sair"):
+    elif content.startswith("sair") or "sai da voz" in content:
         if ctx.guild.voice_client:
             await ctx.guild.voice_client.disconnect()
             await ctx.send("Desconectado do canal de voz!")
         else:
             await ctx.send("Não estou em nenhum canal de voz!")
         return  # Impede a IA de responder
-    # Responde se mencionado ou se o nome "AI Revolution" aparece
+    # Responde se mencionado ou se o nome "AI Revolution" aparece (exceto para comandos)
     elif bot.user.mentioned_in(message) or "ai revolution" in content or "revolution" in content:
         # Obtém contexto da conversa
         context = db.get_context(str(message.author.id), str(message.guild.id))
