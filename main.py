@@ -2,80 +2,95 @@ import discord
 import openai
 import os
 import json
-import asyncio
+import tiktoken
+from datetime import datetime
+from collections import deque
 
-from discord.ext import commands
-
-# Configurações
-MODEL = "gpt-4_1-2025-04-14"
-MAX_INPUT_TOKENS = 950_000
-MAX_OUTPUT_TOKENS = 950_000
-MEMORY_FILE = "memory.json"
-MEMORY_LIMIT = 100
-
-# Carregar memória do arquivo
-if os.path.exists(MEMORY_FILE):
-    with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-        memory = json.load(f)
-else:
-    memory = []
-
-# Salvar memória no arquivo
-def save_memory():
-    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(memory, f, indent=2)
-
-# Inicializar bot
 intents = discord.Intents.default()
-intents.messages = True
 intents.message_content = True
-client = commands.Bot(command_prefix="!", intents=intents)
+client = discord.Client(intents=intents)
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
-if not DISCORD_TOKEN:
-    raise ValueError("Variável DISCORD_TOKEN não encontrada.")
+# Limites
+MAX_TOKENS_IN = 950000
+MAX_TOKENS_OUT = 950000
+CONTEXT_LIMIT = 100
+MEMORY_FILE = "memory.json"
+MODEL_NAME = "gpt-4_1-2025-04-14"
 
-# Verifica se o bot foi mencionado ou chamado pelo nome
-def bot_foi_chamado(message: discord.Message):
-    if client.user is None:
-        return False
-    chamado_direto = client.user in message.mentions
-    chamado_por_nome = client.user.name.lower() in message.content.lower()
-    return chamado_direto or chamado_por_nome
+# Codificador de tokens
+encoding = tiktoken.encoding_for_model("gpt-4")
 
-# Gerar resposta com OpenAI
-async def gerar_resposta():
-    context = memory[-MEMORY_LIMIT:]
-    response = openai.ChatCompletion.create(
-        model=MODEL,
-        messages=context,
-        max_tokens=MAX_OUTPUT_TOKENS,
+# Prompt base pra IA se identificar
+base_prompt = {
+    "role": "system",
+    "content": (
+        f"Você é uma IA avançada usando o modelo {MODEL_NAME}. Você tem memória de longo prazo salva em arquivo "
+        f"e responde automaticamente sempre que for mencionada ou perceber que estão falando com você. "
+        f"Seu objetivo é manter conversas naturais, com contexto e sem a necessidade de comandos. "
+        f"Use até 950 mil tokens no input e no output."
     )
-    return response.choices[0].message.content
+}
+
+# Carregar memória
+def load_memory():
+    if os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return deque(data, maxlen=CONTEXT_LIMIT)
+    return deque(maxlen=CONTEXT_LIMIT)
+
+# Salvar memória
+def save_memory(memory):
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(list(memory), f, ensure_ascii=False, indent=2)
+
+# Calcular tokens
+def count_tokens(messages):
+    total = 0
+    for m in messages:
+        total += len(encoding.encode(m["content"]))
+    return total
+
+# Responder com IA
+async def ask_openai(memory):
+    messages = [base_prompt] + list(memory)
+    input_tokens = count_tokens(messages)
+    if input_tokens > MAX_TOKENS_IN:
+        print("[WARNING] Tokens de entrada excederam o limite.")
+
+    response = openai.ChatCompletion.create(
+        model="gpt-4-1106-preview",
+        messages=messages,
+        max_tokens=MAX_TOKENS_OUT,
+    )
+    return response.choices[0].message["content"]
+
+# Verifica se foi mencionado ou citado indiretamente
+def bot_was_called(message):
+    return client.user.mentioned_in(message) or client.user.name.lower() in message.content.lower()
+
+# Memória atual
+memory = load_memory()
 
 @client.event
 async def on_ready():
-    print(f"Logado como {client.user}")
+    print(f"[READY] Logado como {client.user}")
 
 @client.event
 async def on_message(message):
-    if message.author == client.user:
+    if message.author == client.user or not bot_was_called(message):
         return
 
-    if bot_foi_chamado(message):
-        print(f"[+] Mensagem detectada: {message.content}")
-        memory.append({"role": "user", "content": message.content})
-        memory[:] = memory[-MEMORY_LIMIT:]  # Limitar memória
+    print(f"[MSG] {message.author}: {message.content}")
 
-        try:
-            resposta = await gerar_resposta()
-            memory.append({"role": "assistant", "content": resposta})
-            memory[:] = memory[-MEMORY_LIMIT:]
-            save_memory()
-            await message.channel.send(resposta)
-        except Exception as e:
-            await message.channel.send(f"Erro ao gerar resposta: {str(e)}")
+    memory.append({"role": "user", "content": message.content})
+    reply = await ask_openai(memory)
+    memory.append({"role": "assistant", "content": reply})
+    save_memory(memory)
+
+    await message.channel.send(reply)
 
 client.run(DISCORD_TOKEN)
