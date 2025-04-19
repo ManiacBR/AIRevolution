@@ -14,7 +14,7 @@ client = discord.Client(intents=intents)
 
 # Configura OpenAI
 openai.api_key = OPENAI_API_KEY
-MODEL = "gpt-4-1106-preview"
+MODEL = "gpt-4.1-2025-04-14"
 
 # Carrega memória
 try:
