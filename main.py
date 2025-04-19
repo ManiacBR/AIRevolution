@@ -6,7 +6,7 @@ import tiktoken
 from openai import OpenAI
 from github import Github
 from datetime import datetime, timedelta, UTC
-from collections import defaultdict  # Adicionado import
+from collections import defaultdict
 
 # Carregar variáveis de ambiente
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -103,7 +103,17 @@ user_cooldowns = defaultdict(lambda: {"count": 0, "last_time": None})
 # Função para interagir com o OpenAI
 async def ask_openai(memory, language="pt"):
     try:
-        prompt = [{"role": "system", "content": f"Responda em {language}."}] + memory
+        prompt = [
+            {
+                "role": "system",
+                "content": (
+                    f"Você é o Revolution, um assistente virtual baseado no modelo gpt-4.1-2025-04-14, criado para ajudar no Discord. "
+                    f"Seu conhecimento é atualizado até abril de 2025, permitindo respostas precisas e recentes. "
+                    f"Responda em {language}, mantendo um tom natural e amigável. "
+                    f"Se perguntado sobre seu modelo ou identidade, informe que você é o Revolution, baseado no gpt-4.1-2025-04-14."
+                )
+            }
+        ] + memory
         response = openai_client.chat.completions.create(
             model="gpt-4.1-2025-04-14",
             messages=prompt,
@@ -213,7 +223,7 @@ async def on_message(message):
 
                 # Resposta padrão
                 if any(keyword in msg_content for keyword in ["qual é o seu modelo", "qual modelo você é", "quem é você", "qual é o modelo"]):
-                    reply = "Eu sou Revolution, um assistente baseado no modelo gpt-4.1-2025-04-14, criado para ajudar no Discord!"
+                    reply = "Eu sou Revolution, um assistente baseado no modelo gpt-4.1-2025-04-14, com conhecimento atualizado até abril de 2025, criado para ajudar no Discord!"
                     memory.append({"role": "user", "content": message.content})
                     memory.append({"role": "assistant", "content": reply})
                 else:
