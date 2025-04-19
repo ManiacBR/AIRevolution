@@ -1,32 +1,45 @@
-import speech_recognition as sr
+import os
 import pyttsx3
-import asyncio
-import logging
+import speech_recognition as sr
+import tempfile
 import discord
-import wave
-import io
-
-logger = logging.getLogger(__name__)
 
 class VoiceHandler:
-    def __init__(self, db):
-        logger.info("Inicializando VoiceHandler")
-        self.db = db
-        self.recognizer = sr.Recognizer()
-        self.engine = pyttsx3.init()
+    def __init__(self, database):
+        self.db = database
+        self.engine = pyttsx3.init(driverName='espeak')  # Especifica o driver do TTS
+        self.engine.setProperty('rate', 160)
+        self.engine.setProperty('volume', 1.0)
+        print("Inicializando VoiceHandler")
 
-    def speak(self, text, filename="response.wav"):
-        logger.info(f"Gerando fala: {text}")
-        self.engine.save_to_file(text, filename)
+    def speak(self, text, filename='response.mp3'):
+        """Converte texto em fala e salva como arquivo"""
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tf:
+            temp_path = tf.name
+        self.engine.save_to_file(text, temp_path)
         self.engine.runAndWait()
-        return filename
 
-    async def handle_voice_interaction(self, voice_client, ai, text_channel):
-        logger.info("Iniciando interação de voz simulada (sem gravação)")
+        # Converte para mp3 se ffmpeg estiver disponível
+        mp3_path = filename
+        os.system(f"ffmpeg -y -loglevel quiet -i {temp_path} {mp3_path}")
+        os.remove(temp_path)
+        return mp3_path
+
+    def transcribe_audio(self, audio_path):
+        """Transcreve fala de um arquivo de áudio"""
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(audio_path) as source:
+            audio = recognizer.record(source)
         try:
-            await text_channel.send("A interação de voz está ativa! (Mas a gravação ainda não está implementada)")
-            await asyncio.sleep(10)
-            await text_channel.send("Encerrando interação simulada de voz.")
-            await voice_client.disconnect()
-        except Exception as e:
-            logger.error(f"Erro durante interação de voz: {str(e)}")
+            text = recognizer.recognize_google(audio, language='pt-BR')
+            return text
+        except sr.UnknownValueError:
+            return "Não entendi o que você disse."
+        except sr.RequestError:
+            return "Erro ao se comunicar com o serviço de reconhecimento de voz."
+
+    async def send_voice_response(self, interaction: discord.Interaction, text: str):
+        """Gera resposta em áudio e envia no canal de texto"""
+        file_path = self.speak(text)
+        await interaction.channel.send(file=discord.File(file_path))
+        os.remove(file_path)
