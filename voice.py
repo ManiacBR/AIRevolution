@@ -35,7 +35,11 @@ class VoiceHandler:
                 if user_input:
                     user_input_lower = user_input.lower()
                     # Verifica variações do comando sair
-                    if any(phrase in user_input_lower for phrase in ["sair", "sai da voz", "sai da vos", "sair da voz"]):
+                    exit_phrases = [
+                        "sair", "sai da voz", "sai da vos", "sair da voz", 
+                        "sair voz", "sai voz", "desconectar", "sair do canal"
+                    ]
+                    if any(phrase in user_input_lower for phrase in exit_phrases):
                         await voice_client.disconnect()
                         await channel.send("Desconectado do canal de voz!")
                         break
