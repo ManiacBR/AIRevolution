@@ -1,12 +1,16 @@
-# Usa imagem base com Python
+# Usa uma imagem oficial do Python como base
 FROM python:3.10-slim
 
-# Define diretório de trabalho
+# Define o diretório de trabalho no container
 WORKDIR /app
 
-# Instala dependências de sistema
+# Copia os arquivos do projeto para o container
+COPY . .
+
+# Instala dependências do sistema (para PyAudio, pyttsx3 e speech recognition)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
+    espeak \
     libasound-dev \
     portaudio19-dev \
     libportaudio2 \
@@ -16,9 +20,6 @@ RUN apt-get update && apt-get install -y \
     libpulse-dev \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
-
-# Copia os arquivos para o container
-COPY . .
 
 # Instala as dependências do Python
 RUN pip install --no-cache-dir -r requirements.txt
