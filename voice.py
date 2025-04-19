@@ -1,11 +1,11 @@
 import speech_recognition as sr
 import pyttsx3
 import discord
-from discord.ext import audiorec
 import asyncio
 import logging
 import io
 import wave
+import tempfile
 
 # Configura logging
 logging.basicConfig(
@@ -40,31 +40,40 @@ class VoiceHandler:
     async def listen(self, voice_client, timeout=15):
         logger.info("Iniciando escuta de áudio via Discord")
         try:
-            sink = audiorec.sinks.WaveSink()
-            voice_client.start_recording(sink, self.callback, None)
+            # Cria um arquivo temporário para armazenar o áudio
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+                temp_path = temp_file.name
+            
+            # Configura FFmpeg para capturar áudio
+            pcm = voice_client.recv_audio(discord.FFmpegPCMAudio(temp_path, pipe=True))
+            voice_client.start_recording(pcm)
             await asyncio.sleep(timeout)
             voice_client.stop_recording()
             
-            if sink.file:
-                audio_data = sink.file.getvalue()
-                wav_file = io.BytesIO(audio_data)
-                with wave.open(wav_file, 'rb') as wav:
-                    audio_source = sr.AudioFile(wav)
-                    with audio_source as source:
-                        audio = self.recognizer.record(source)
-                    text = self.recognizer.recognize_google(audio)
-                    logger.info(f"Áudio transcrito: {text}")
-                    return text
-            return None
+            # Processa o áudio capturado
+            with wave.open(temp_path, 'rb') as wav:
+                audio_source = sr.AudioFile(wav)
+                with audio_source as source:
+                    audio = self.recognizer.record(source)
+                text = self.recognizer.recognize_google(audio)
+                logger.info(f"Áudio transcrito: {text}")
+                return text
         except sr.UnknownValueError:
             logger.warning("Nenhum áudio compreendido")
             return None
         except sr.RequestError as e:
             logger.error(f"Erro na transcrição: {str(e)}")
-            return None  # Não envia erro ao canal
+            return None
         except Exception as e:
             logger.error(f"Erro inesperado na escuta: {str(e)}")
-            return None  # Não envia erro ao canal
+            return None
+        finally:
+            # Remove o arquivo temporário
+            try:
+                import os
+                os.unlink(temp_path)
+            except:
+                pass
 
     async def callback(self, sink, *args):
         logger.info("Callback de gravação chamado")
