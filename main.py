@@ -32,10 +32,10 @@ intents.message_content = True
 client = commands.Bot(command_prefix="!", intents=intents)
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
-DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
 if not DISCORD_TOKEN:
-    raise ValueError("Variável DISCORD_BOT_TOKEN não encontrada.")
+    raise ValueError("Variável DISCORD_TOKEN não encontrada.")
 
 # Verifica se o bot foi mencionado ou chamado pelo nome
 def bot_foi_chamado(message: discord.Message):
