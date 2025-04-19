@@ -1,34 +1,17 @@
-from openai import AsyncOpenAI
 import os
+import openai
 from dotenv import load_dotenv
 
 load_dotenv()
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-class AIRevolution:
-    def __init__(self):
-        self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.model = "gpt-4.1-2025-04-14"
-
-    async def generate_response(self, prompt, context=None, extra_instruction=""):
-        if context is None:
-            context = []
-        messages = [
-            {"role": "system", "content": f"You are AI Revolution, a highly intelligent and friendly Discord bot inspired by Jarvis from Iron Man. Be concise, witty, and helpful. Keep responses under 2000 characters. {extra_instruction}"}
-        ]
-        for msg in context:
-            messages.append({"role": "user", "content": msg})
-        messages.append({"role": "user", "content": prompt})
-
+class OpenAIHandler:
+    async def get_response(self, prompt):
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=500,
-                temperature=0.7
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}]
             )
-            text = response.choices[0].message.content.strip()
-            if len(text) > 2000:
-                text = text[:1997] + "..."
-            return text
+            return response.choices[0].message["content"]
         except Exception as e:
-            return f"Erro ao processar a solicitação: {str(e)}"
+            return f"Erro ao gerar resposta: {e}"
