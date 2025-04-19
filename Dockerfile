@@ -1,4 +1,4 @@
-# Usa a imagem base do Python 3.11
+# Usa a imagem base do Python 3.11 para incluir distutils
 FROM python:3.11
 
 # Instala dependências do sistema (libespeak para pyttsx3, portaudio e alsa para áudio)
@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Instala setuptools para compatibilidade
+# Instala setuptools para compatibilidade com distutils
 RUN pip install setuptools
 
 # Define o diretório de trabalho
