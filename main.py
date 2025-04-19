@@ -109,23 +109,11 @@ async def on_message(message):
             return
         # Responde se mencionado ou se o nome "AI Revolution" aparece
         elif bot.user.mentioned_in(message) or "ai revolution" in content or "revolution" in content:
-            # Verifica mensagem referenciada
-            referenced_content = ""
-            if message.reference:
-                try:
-                    referenced_message = await ctx.channel.fetch_message(message.reference.message_id)
-                    referenced_content = f"Mensagem referenciada: {referenced_message.content}\n"
-                    logger.info(f"Mensagem referenciada encontrada: {referenced_message.content}")
-                except discord.NotFound:
-                    logger.warning("Mensagem referenciada não encontrada")
-            # Obtém contexto da conversa
             context = db.get_context(str(message.author.id), str(message.guild.id))
-            # Inclui mensagem referenciada no prompt
-            prompt = f"{referenced_content}{message.content}"
             response = await ai.generate_response(
-                prompt,
+                message.content,
                 context,
-                extra_instruction="Responda sempre em português, considerando o contexto da mensagem referenciada, se houver."
+                extra_instruction="Responda sempre em português, independentemente do idioma da mensagem."
             )
             db.save_message(str(message.author.id), str(message.guild.id), message.content)
             await message.channel.send(response)
@@ -133,8 +121,5 @@ async def on_message(message):
     except Exception as e:
         logger.error(f"Erro ao processar mensagem: {str(e)}")
         await ctx.send(f"Erro inesperado: {str(e)}")
-
-    # Não processa comandos automáticos
-    # await bot.process_commands(message)
 
 bot.run(os.getenv("DISCORD_TOKEN"))
