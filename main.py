@@ -39,9 +39,10 @@ async def on_message(message):
                 await ctx.channel.purge(limit=limit)
                 await ctx.send(f"{limit} mensagens limpas com sucesso!", delete_after=5)
             except discord.HTTPException:
-                await ctx.send("Erro ao limpar mensagens. Tente novamente.")
+                await ctx.send("Erro ao limpar mensagens. Verifique minhas permissões ou tente novamente.")
         else:
             await ctx.send("Você precisa de permissão para gerenciar mensagens.")
+        return  # Impede a IA de responder
     elif content.startswith("apagar"):
         if ctx.author.guild_permissions.manage_messages:
             try:
@@ -59,9 +60,10 @@ async def on_message(message):
             except discord.NotFound:
                 await ctx.send("Mensagem não encontrada.")
             except discord.HTTPException:
-                await ctx.send("Erro ao apagar a mensagem. Tente novamente.")
+                await ctx.send("Erro ao apagar a mensagem. Verifique minhas permissões.")
         else:
             await ctx.send("Você precisa de permissão para gerenciar mensagens.")
+        return  # Impede a IA de responder
     elif content.startswith("voz"):
         if ctx.author.voice:
             channel = ctx.author.voice.channel
@@ -70,6 +72,14 @@ async def on_message(message):
             await ctx.send("Conectado ao canal de voz! Fale comigo!")
         else:
             await ctx.send("Você precisa estar em um canal de voz!")
+        return  # Impede a IA de responder
+    elif content.startswith("sair"):
+        if ctx.guild.voice_client:
+            await ctx.guild.voice_client.disconnect()
+            await ctx.send("Desconectado do canal de voz!")
+        else:
+            await ctx.send("Não estou em nenhum canal de voz!")
+        return  # Impede a IA de responder
     # Responde se mencionado ou se o nome "AI Revolution" aparece
     elif bot.user.mentioned_in(message) or "ai revolution" in content or "revolution" in content:
         # Obtém contexto da conversa
