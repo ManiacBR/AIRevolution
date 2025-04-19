@@ -1,59 +1,76 @@
 import discord
-import openai
-import json
 import os
+import json
+from openai import OpenAI
 
-# Variáveis do ambiente
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# Carrega variáveis de ambiente
+DISCORD_TOKEN   = os.getenv("DISCORD_TOKEN")
+OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY")
 
-# Inicializa cliente
-intents = discord.Intents.default()
-intents.message_content = True
-client = discord.Client(intents=intents)
+# Inicializa cliente OpenAI (>=1.0.0)
+oai = OpenAI(api_key=OPENAI_API_KEY)
+MODEL = "gpt-4.1"  # Modelo principal da série GPT‑4.1
 
-# Configura OpenAI
-openai.api_key = OPENAI_API_KEY
-MODEL = "gpt-4.1-2025-04-14"
-
-# Carrega memória
+# 🧠 Memória persistente em arquivo
 try:
     with open("memory.json", "r") as f:
         memory = json.load(f)
 except FileNotFoundError:
     memory = []
 
-# Salva memória
 def save_memory():
     with open("memory.json", "w") as f:
-        json.dump(memory[-20:], f, indent=4)  # mantém últimas 20 interações
+        json.dump(memory[-20:], f, indent=4)
 
-# Gera resposta com OpenAI
-async def generate_response(user_message):
-    memory.append({"role": "user", "content": user_message})
+# Configura Discord
+intents = discord.Intents.default()
+intents.message_content = True
+bot = discord.Client(intents=intents)
+
+async def generate_openai_response(prompt: str) -> str:
+    memory.append({"role": "user", "content": prompt})
     try:
-        response = openai.chat.completions.create(
+        resp = oai.chat.completions.create(
             model=MODEL,
-            messages=memory[-20:],  # mantemos só o contexto mais recente
+            messages=memory[-20:],
             max_tokens=1000
         )
-        reply = response.choices[0].message.content
+        reply = resp.choices[0].message.content
         memory.append({"role": "assistant", "content": reply})
         save_memory()
         return reply
     except Exception as e:
         return f"Erro ao gerar resposta: {e}"
 
-# Evento de mensagem
-@client.event
+@bot.event
+async def on_ready():
+    print(f"Conectado como {bot.user} (id: {bot.user.id})")
+
+@bot.event
 async def on_message(message):
-    if message.author == client.user:
+    if message.author.bot:
         return
 
-    if client.user.mentioned_in(message) or message.channel.type.name == "private":
-        await message.channel.typing()
-        response = await generate_response(message.content)
-        await message.reply(response)
+    # Quando alguém pergunta "quantos tokens" ou "qual modelo"
+    content_lower = message.content.lower()
+    if "qual modelo" in content_lower:
+        await message.channel.send(f"Estou usando o modelo **{MODEL}** (GPT‑4.1 mais recente) 2")
+        return
 
-# Inicia bot
-client.run(DISCORD_TOKEN)
+    # Responde menções normalmente
+    if bot.user in message.mentions:
+        prompt = (
+            message.content
+            .replace(f"<@{bot.user.id}>", "")
+            .replace(f"<@!{bot.user.id}>", "")
+            .strip()
+        )
+        if not prompt:
+            await message.channel.send("Olá! Como posso ajudar?")
+        else:
+            await message.channel.typing()
+            reply = await generate_openai_response(prompt)
+            await message.reply(reply)
+
+if __name__ == "__main__":
+    bot.run(DISCORD_TOKEN)
