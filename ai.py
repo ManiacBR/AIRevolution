@@ -7,7 +7,7 @@ load_dotenv()
 class AIRevolution:
     def __init__(self):
         self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.model = "gpt-4_1-2025-04-14"
+        self.model = "gpt-4.1-2025-04-14"
 
     async def generate_response(self, prompt, context=[]):
         messages = [
