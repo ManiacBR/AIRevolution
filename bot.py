@@ -16,9 +16,9 @@ client = discord.Client(intents=intents)
 
 async def generate_openai_response(prompt):
     try:
-        # Correção: Usando o endpoint correto para o modelo de chat
-        response = openai.chat_completions.create(
-            model="gpt-4.1",  # Modelo GPT-4.1
+        # Correção: Usando a função correta para chat
+        response = openai.ChatCompletion.create(
+            model="gpt-4",  # Modelo GPT-4
             messages=[{"role": "user", "content": prompt}],
         )
         return response['choices'][0]['message']['content']
