@@ -129,16 +129,27 @@ async def on_message(message):
                     thread = await message.create_thread(name=f"Conversa com {message.author.name}", auto_archive_duration=60)
                     channel = thread
 
-                # Deletar mensagem
+                # Deletar mensagem referenciada
                 if any(keyword in msg_content for keyword in ["apaga", "delete", "remove"]):
-                    try:
-                        await message.delete()
-                        await channel.send("Mensagem deletada!")
-                    except discord.errors.Forbidden:
-                        await channel.send("Não tenho permissão para deletar mensagens neste canal.")
-                    except Exception as e:
-                        print(f"Erro ao deletar mensagem: {e}")
-                        await channel.send("Erro ao tentar deletar a mensagem.")
+                    if message.reference:  # Verifica se há uma mensagem referenciada
+                        try:
+                            referenced_message = await message.channel.fetch_message(message.reference.message_id)
+                            # Verificar permissões
+                            permissions = message.channel.permissions_for(message.guild.me)
+                            if not permissions.manage_messages:
+                                await channel.send("Não tenho permissão para deletar mensagens neste canal.")
+                                return
+                            await referenced_message.delete()
+                            await channel.send("Mensagem referenciada deletada!")
+                        except discord.errors.Forbidden:
+                            await channel.send("Não tenho permissão para deletar mensagens neste canal.")
+                        except discord.errors.NotFound:
+                            await channel.send("A mensagem referenciada não foi encontrada.")
+                        except Exception as e:
+                            print(f"Erro ao deletar mensagem referenciada: {e}")
+                            await channel.send("Erro ao tentar deletar a mensagem referenciada.")
+                    else:
+                        await channel.send("Por favor, responda à mensagem que deseja apagar.")
                     return
 
                 # Configurar canal
