@@ -20,7 +20,10 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Função para contar os tokens
 def contar_tokens(messages):
-    encoding = tiktoken.encoding_for_model("gpt-4.1-2025-04-14")
+    try:
+        encoding = tiktoken.get_encoding("o200k_base")  # Tokenizador para modelos avançados
+    except:
+        encoding = tiktoken.get_encoding("cl100k_base")  # Fallback
     total_tokens = 0
     for msg in messages:
         if not isinstance(msg, dict) or "role" not in msg or "content" not in msg:
@@ -61,7 +64,7 @@ async def ask_openai(memory):
         return response.choices[0].message.content
     except Exception as e:
         print(f"Erro na API da OpenAI: {e}")
-        return "Desculpe, ocorreu um erro ao processar sua solicitação."
+        return f"Erro ao chamar a API: {str(e)}"
 
 @client.event
 async def on_ready():
@@ -75,24 +78,28 @@ async def on_message(message):
         return
 
     if client.user.mentioned_in(message) or client.user.name.lower() in message.content.lower():
-        memory.append({"role": "user", "content": message.content})
-
-        if len(memory) > MAX_MEMORY_MESSAGES:
-            memory = memory[-MAX_MEMORY_MESSAGES:]
-
-        while contar_tokens(memory) > MAX_TOKENS:
-            memory = memory[1:]
-
-        reply = await ask_openai(memory)
-        memory.append({"role": "assistant", "content": reply})
-
         try:
-            with open(MEMORY_FILE, "w") as f:
-                json.dump(memory, f, indent=2)
-        except IOError as e:
-            print(f"Erro ao salvar memória: {e}")
+            memory.append({"role": "user", "content": message.content})
 
-        await message.channel.send(reply)
+            if len(memory) > MAX_MEMORY_MESSAGES:
+                memory = memory[-MAX_MEMORY_MESSAGES:]
+
+            while contar_tokens(memory) > MAX_TOKENS:
+                memory = memory[1:]
+
+            reply = await ask_openai(memory)
+            memory.append({"role": "assistant", "content": reply})
+
+            try:
+                with open(MEMORY_FILE, "w") as f:
+                    json.dump(memory, f, indent=2)
+            except IOError as e:
+                print(f"Erro ao salvar memória: {e}")
+
+            await message.channel.send(reply)
+        except Exception as e:
+            print(f"Erro no processamento da mensagem: {e}")
+            await message.channel.send("Desculpe, ocorreu um erro ao processar sua mensagem.")
 
 # Rodar o bot
 client.run(DISCORD_TOKEN)
