@@ -5,7 +5,8 @@ import asyncio
 import tiktoken
 from openai import OpenAI
 from github import Github
-from datetime import datetime, timedelta, UTC  # Importar UTC
+from datetime import datetime, timedelta, UTC
+from collections import defaultdict  # Adicionado import
 
 # Carregar variáveis de ambiente
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -127,7 +128,7 @@ async def on_message(message):
 
     # Verificar cooldown
     user_id = str(message.author.id)
-    now = datetime.now(UTC)  # Corrigido: usar datetime.now(UTC)
+    now = datetime.now(UTC)
     if user_cooldowns[user_id]["last_time"] and now - user_cooldowns[user_id]["last_time"] < timedelta(seconds=COOLDOWN_SECONDS):
         if user_cooldowns[user_id]["count"] >= MAX_MESSAGES_PER_COOLDOWN:
             await message.channel.send("Você está enviando mensagens rápido demais. Tente novamente em um minuto.")
