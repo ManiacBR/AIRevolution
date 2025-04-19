@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class VoiceHandler:
     def __init__(self, db):
         logger.info("Inicializando VoiceHandler")
-        self.db = db  # Armazena a instância de db
+        self.db = db
         try:
             self.recognizer = sr.Recognizer()
             self.engine = pyttsx3.init()
@@ -39,13 +39,11 @@ class VoiceHandler:
     async def listen(self, voice_client, timeout=15):
         logger.info("Iniciando escuta de áudio via Discord")
         try:
-            # Configura um sink de áudio para capturar o stream
             sink = discord.sinks.WaveSink()
             voice_client.start_recording(sink, self.callback, None)
             await asyncio.sleep(timeout)
             voice_client.stop_recording()
             
-            # Processa o áudio capturado
             if sink.file:
                 audio_data = sink.file.getvalue()
                 wav_file = io.BytesIO(audio_data)
