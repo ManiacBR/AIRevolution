@@ -1,5 +1,5 @@
-# Usa a imagem base do Python (não slim para evitar problemas de dependências)
-FROM python:3.12
+# Usa a imagem base do Python 3.11 para incluir distutils
+FROM python:3.11
 
 # Instala dependências do sistema (libespeak e portaudio para PyAudio)
 RUN apt-get update && apt-get install -y \
@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Instala setuptools para compatibilidade
+RUN pip install setuptools
 
 # Define o diretório de trabalho
 WORKDIR /app
