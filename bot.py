@@ -32,9 +32,10 @@ async def generate_openai_response(prompt):
         return "Limite de tokens atingido. Não posso mais responder."
 
     # Faz a requisição para o modelo GPT-4 (nova interface)
-    response = openai.ChatCompletion.create(
+    response = openai.completions.create(
         model="gpt-4.1-2025-04-14",  # Usando o modelo específico
-        messages=[{"role": "user", "content": prompt}]
+        prompt=prompt,  # Envia a prompt como string
+        max_tokens=150  # Limita o número de tokens na resposta
     )
 
     # Calcula e atualiza os tokens usados
@@ -44,7 +45,7 @@ async def generate_openai_response(prompt):
     used_output_tokens += output_tokens
 
     # Retorna a resposta gerada
-    return response['choices'][0]['message']['content'].strip()
+    return response['choices'][0]['text'].strip()
 
 # Evento quando o bot recebe uma mensagem
 @client.event
