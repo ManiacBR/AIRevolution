@@ -11,33 +11,33 @@ class ConversationDatabase:
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
                     user_id TEXT,
-                    channel_id TEXT,
+                    guild_id TEXT,
                     message TEXT,
                     timestamp DATETIME,
-                    PRIMARY KEY (user_id, channel_id)
+                    PRIMARY KEY (user_id, guild_id)
                 )
             """)
 
-    def save_message(self, user_id, channel_id, message):
+    def save_message(self, user_id, guild_id, message):
         with self.conn:
             self.conn.execute("""
-                INSERT OR REPLACE INTO conversations (user_id, channel_id, message, timestamp)
+                INSERT OR REPLACE INTO conversations (user_id, guild_id, message, timestamp)
                 VALUES (?, ?, ?, ?)
-            """, (user_id, channel_id, message, datetime.now()))
+            """, (user_id, guild_id, message, datetime.now()))
 
-    def get_context(self, user_id, channel_id, time_limit_hours=1):
+    def get_context(self, user_id, guild_id, time_limit_hours=1):
         cutoff = datetime.now() - timedelta(hours=time_limit_hours)
         cursor = self.conn.cursor()
         cursor.execute("""
             SELECT message FROM conversations
-            WHERE user_id = ? AND channel_id = ? AND timestamp > ?
+            WHERE user_id = ? AND guild_id = ? AND timestamp > ?
             ORDER BY timestamp ASC
-        """, (user_id, channel_id, cutoff))
+        """, (user_id, guild_id, cutoff))
         return [row[0] for row in cursor.fetchall()]
 
-    def clear_context(self, user_id, channel_id):
+    def clear_context(self, user_id, guild_id):
         with self.conn:
             self.conn.execute("""
                 DELETE FROM conversations
-                WHERE user_id = ? AND channel_id = ?
-            """, (user_id, channel_id))
+                WHERE user_id = ? AND guild_id = ?
+            """, (user_id, guild_id))
