@@ -1,17 +1,16 @@
 import os
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-class OpenAIHandler:
-    async def get_response(self, prompt):
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[{"role": "user", "content": prompt}]
-            )
-            return response.choices[0].message["content"]
-        except Exception as e:
-            return f"Erro ao gerar resposta: {e}"
+async def ask_openai(messages, model="gpt-4.1-2025-04-14"):
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": m} for m in messages]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Ocorreu um erro: {e}"
