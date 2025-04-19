@@ -1,63 +1,77 @@
 import discord
 import openai
-import json
 import os
-from datetime import datetime
+import json
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+if not DISCORD_TOKEN:
+    raise ValueError("Variável DISCORD_BOT_TOKEN não encontrada.")
+if not OPENAI_API_KEY:
+    raise ValueError("Variável OPENAI_API_KEY não encontrada.")
 
 intents = discord.Intents.default()
 intents.messages = True
 intents.message_content = True
-client = discord.Client(intents=intents)
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
-MODEL = "gpt-4_1-2025-04-14"
+client = discord.Client(intents=intents)
+openai.api_key = OPENAI_API_KEY
+
 MEMORY_FILE = "memory.json"
 
-# Carrega a memória se existir
-def load_memory():
-    if os.path.exists(MEMORY_FILE):
-        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
+# Carrega memória do arquivo
+if os.path.exists(MEMORY_FILE):
+    with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+        memory = json.load(f)
+else:
+    memory = {}
 
-# Salva a memória
-def save_memory(memory):
+def save_memory():
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(memory, f, indent=2)
-
-# Gera resposta com o modelo correto
-async def generate_openai_response(memory, user_message):
-    messages = memory + [{"role": "user", "content": user_message}]
-    try:
-        response = openai.chat.completions.create(
-            model=MODEL,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=1024
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        return f"Erro ao gerar resposta: {e}"
+        json.dump(memory, f, ensure_ascii=False, indent=2)
 
 @client.event
 async def on_ready():
-    print(f"Logado como {client.user.name}")
+    print(f"[INFO] Bot conectado como {client.user}")
 
 @client.event
 async def on_message(message):
-    if message.author == client.user or message.channel.type.name != "text":
+    if message.author.bot:
         return
 
-    memory = load_memory()
+    channel_id = str(message.channel.id)
+    user_input = message.content.strip()
 
-    user_input = message.content
-    memory.append({"role": "user", "content": user_input})
+    # Adiciona a nova mensagem à memória
+    if channel_id not in memory:
+        memory[channel_id] = []
+    memory[channel_id].append({"role": "user", "content": user_input})
 
-    response = await generate_openai_response(memory, user_input)
-    memory.append({"role": "assistant", "content": response})
+    # Mantém até 20 mensagens na memória
+    memory[channel_id] = memory[channel_id][-20:]
 
-    save_memory(memory)
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-4_1-2025-04-14",
+            messages=memory[channel_id],
+            max_tokens=500,
+            temperature=0.7,
+        )
 
-    await message.channel.send(response)
+        ai_reply = response.choices[0].message.content
 
-client.run(os.getenv("DISCORD_BOT_TOKEN"))
+        # Adiciona resposta da IA à memória
+        memory[channel_id].append({"role": "assistant", "content": ai_reply})
+        save_memory()
+
+        await message.channel.send(ai_reply)
+
+    except Exception as e:
+        print("[ERRO AO CHAMAR OPENAI]", e)
+        await message.channel.send("Ocorreu um erro ao gerar a resposta da IA.")
+
+client.run(DISCORD_TOKEN)
