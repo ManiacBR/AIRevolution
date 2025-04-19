@@ -1,7 +1,7 @@
-# Usa a imagem base do Python 3.11 para incluir distutils
+# Usa a imagem base do Python 3.11
 FROM python:3.11
 
-# Instala dependências do sistema (libespeak para pyttsx3, portaudio, alsa, ffmpeg e libsodium para áudio)
+# Instala dependências do sistema
 RUN apt-get update && apt-get install -y \
     libespeak1 \
     portaudio19-dev \
@@ -11,9 +11,10 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
     python3-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Instala setuptools para compatibilidade com distutils
+# Instala setuptools (caso precise do distutils)
 RUN pip install setuptools
 
 # Define o diretório de trabalho
@@ -22,10 +23,10 @@ WORKDIR /app
 # Copia os arquivos do projeto
 COPY . .
 
-# Instala as dependências do Python (remova discord-ext-audiorec do requirements.txt)
+# Instala as dependências normais
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Instala o discord-ext-audiorec diretamente via Git
+# Instala o discord-ext-audiorec direto do repositório GitHub (sem colchetes ou markdown)
 RUN pip install git+https://github.com/Silver-Ture/discord-ext-audiorec.git
 
 # Comando para rodar o bot
