@@ -27,7 +27,7 @@ intents.voice_states = True
 bot = commands.Bot(command_prefix="~", intents=intents)  # Prefixo fictício para evitar CommandNotFound
 ai = AIRevolution()
 db = ConversationDatabase()
-voice_handler = VoiceHandler()
+voice_handler = VoiceHandler(db)  # Passa db para VoiceHandler
 
 @bot.event
 async def on_ready():
