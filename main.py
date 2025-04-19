@@ -1,257 +1,72 @@
 import discord
+from discord.ext import commands
 import os
-import json
-import asyncio
-import tiktoken
-from openai import OpenAI
-from github import Github
-from datetime import datetime, timedelta, timezone
-from collections import defaultdict
-import speech_recognition as sr
-from gtts import gTTS
-import tempfile
-import subprocess
-import io
+from dotenv import load_dotenv
+from ai import AIRevolution
+from database import ConversationDatabase
+from voice import VoiceHandler
 
-# Carregar variáveis de ambiente
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+load_dotenv()
 
-# Validação do token
-print(f"Token carregado: {DISCORD_TOKEN[:10] if DISCORD_TOKEN else 'Nenhum token encontrado'}...")
-if not DISCORD_TOKEN:
-    raise ValueError("DISCORD_TOKEN está vazio ou não foi configurado no ambiente da Railway.")
-if not OPENAI_API_KEY:
-    raise ValueError("OPENAI_API_KEY está vazio ou não foi configurado no ambiente da Railway.")
-
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
-
-# Função para contar os tokens
-def contar_tokens(messages):
-    try:
-        encoding = tiktoken.get_encoding("o200k_base")
-    except:
-        encoding = tiktoken.get_encoding("cl100k_base")
-    total_tokens = 0
-    for msg in messages:
-        if not isinstance(msg, dict) or "role" not in msg or "content" not in msg:
-            continue
-        total_tokens += 4
-        for key, value in msg.items():
-            total_tokens += len(encoding.encode(str(value)))
-        total_tokens += 2
-    return total_tokens
-
-# Função para resumir memória
-async def summarize_memory(memory):
-    if len(memory) < 10:
-        return memory
-    prompt = [{"role": "system", "content": "Resuma o seguinte histórico de conversa em até 200 palavras, mantendo o contexto essencial."}, {"role": "user", "content": json.dumps(memory)}]
-    response = openai_client.chat.completions.create(
-        model="gpt-4.1-2025-04-14",
-        messages=prompt,
-        temperature=0.5,
-        max_tokens=500
-    )
-    summary = response.choices[0].message.content
-    return [{"role": "system", "content": f"Resumo do histórico: {summary}"}]
-
-# Função para verificar intenção de deleção
-async def is_delete_intent(message_content, language="pt"):
-    try:
-        prompt = [
-            {"role": "system", "content": f"Determine se a mensagem indica uma intenção de deletar uma mensagem no Discord. Responda apenas 'sim' ou 'não' em {language}."},
-            {"role": "user", "content": message_content}
-        ]
-        response = openai_client.chat.completions.create(
-            model="gpt-4.1-2025-04-14",
-            messages=prompt,
-            temperature=0.3,
-            max_tokens=10
-        )
-        return response.choices[0].message.content.lower() == "sim"
-    except Exception as e:
-        print(f"Erro ao verificar intenção de deleção: {e}")
-        return False
-
-# Função para interagir com o OpenAI
-async def ask_openai(memory, language="pt"):
-    try:
-        prompt = [
-            {
-                "role": "system",
-                "content": (
-                    f"Você é o Revolution, um assistente virtual baseado no modelo gpt-4.1-2025-04-14, criado para ajudar no Discord. "
-                    f"Seu conhecimento é atualizado até abril de 2025, permitindo respostas precisas e recentes. "
-                    f"Responda em {language}, mantendo um tom natural e amigável. "
-                    f"Se perguntado sobre seu modelo ou identidade, informe que você é o Revolution, baseado no gpt-4.1-2025-04-14."
-                )
-            }
-        ] + memory
-        response = openai_client.chat.completions.create(
-            model="gpt-4.1-2025-04-14",
-            messages=prompt,
-            temperature=0.7,
-            max_tokens=2048
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        print(f"Erro na API da OpenAI: {e}")
-        return f"Erro ao chamar a API: {str(e)}"
-
-# Função para conversão de texto em áudio (gTTS)
-async def text_to_speech(text, language="pt"):
-    tts = gTTS(text=text, lang=language)
-    with tempfile.NamedTemporaryFile(delete=False) as f:
-        tts.save(f.name)
-        return f.name
-
-# Função para reconhecer fala
-async def recognize_speech_from_audio(audio):
-    recognizer = sr.Recognizer()
-    try:
-        with sr.AudioFile(audio) as source:
-            audio_data = recognizer.record(source)
-        return recognizer.recognize_google(audio_data, language="pt-BR")
-    except Exception as e:
-        print(f"Erro ao tentar reconhecer fala: {e}")
-        return None
-
-# Configurações
-MEMORY_FILE = "memory.json"
-CONFIG_FILE = "config.json"
-MAX_MEMORY_MESSAGES = 100
-MAX_TOKENS = 100_000
-COOLDOWN_SECONDS = 60
-MAX_MESSAGES_PER_COOLDOWN = 5
-
-# Configurações do Discord
 intents = discord.Intents.default()
-intents.messages = True
 intents.message_content = True
-client = discord.Client(intents=intents)
+intents.voice_states = True
+bot = commands.Bot(command_prefix="", intents=intents)
+ai = AIRevolution()
+db = ConversationDatabase()
+voice_handler = VoiceHandler()
 
-# Carrega memória e configuração
-try:
-    with open(MEMORY_FILE, "r") as f:
-        memory = json.load(f)
-except (FileNotFoundError, json.JSONDecodeError):
-    memory = []
-
-try:
-    with open(CONFIG_FILE, "r") as f:
-        config = json.load(f)
-except FileNotFoundError:
-    config = {"allowed_channels": [], "user_languages": {}}
-
-# Cooldowns
-user_cooldowns = defaultdict(lambda: {"count": 0, "last_time": None})
-
-@client.event
+@bot.event
 async def on_ready():
-    print(f"Bot conectado como {client.user}")
+    print(f"Logado como {bot.user}")
 
-@client.event
+@bot.event
 async def on_message(message):
-    global memory
-    print(f"Mensagem recebida: {message.content}")
-    if message.author == client.user:
+    if message.author == bot.user:
         return
 
-    # Verificar cooldown
-    user_id = str(message.author.id)
-    now = datetime.now(timezone.utc)
-    if user_cooldowns[user_id]["last_time"] and now - user_cooldowns[user_id]["last_time"] < timedelta(seconds=COOLDOWN_SECONDS):
-        if user_cooldowns[user_id]["count"] >= MAX_MESSAGES_PER_COOLDOWN:
-            await message.channel.send("Você está enviando mensagens rápido demais. Tente novamente em um minuto.")
-            return
-        user_cooldowns[user_id]["count"] += 1
+    content = message.content.lower()
+    # Responde se mencionado ou se o nome "AI Revolution" aparece
+    if bot.user.mentioned_in(message) or "ai revolution" in content or "revolution" in content:
+        # Obtém contexto da conversa
+        context = db.get_context(str(message.author.id), str(message.channel.id))
+        # Gera resposta
+        response = await ai.generate_response(message.content, context)
+        # Salva a mensagem no banco
+        db.save_message(str(message.author.id), str(message.channel.id), message.content)
+        # Envia resposta, respeitando o limite de 2000 caracteres
+        await message.channel.send(response)
+
+    await bot.process_commands(message)
+
+@bot.command(name="limpar")
+async def clear_chat(ctx):
+    if ctx.author.guild_permissions.manage_messages:
+        await ctx.channel.purge(limit=100)
+        await ctx.send("Chat limpo com sucesso!", delete_after=5)
     else:
-        user_cooldowns[user_id] = {"count": 1, "last_time": now}
+        await ctx.send("Você não tem permissão para limpar o chat.")
 
-    if client.user.mentioned_in(message) or "revolution" in message.content.lower():
-        if not config["allowed_channels"] or message.channel.id in config["allowed_channels"]:
-            try:
-                msg_content = message.content.lower()
-                channel = message.channel
-                language = config["user_languages"].get(user_id, "pt")  # Default para português
+@bot.command(name="apagar")
+async def delete_message(ctx, message_id: int):
+    if ctx.author.guild_permissions.manage_messages:
+        try:
+            message = await ctx.channel.fetch_message(message_id)
+            await message.delete()
+            await ctx.send("Mensagem apagada com sucesso!", delete_after=5)
+        except discord.NotFound:
+            await ctx.send("Mensagem não encontrada.")
+    else:
+        await ctx.send("Você não tem permissão para apagar mensagens.")
 
-                # Verificar intenção de deleção
-                if await is_delete_intent(message.content, language) and message.reference:
-                    try:
-                        referenced_message = await message.channel.fetch_message(message.reference.message_id)
-                        permissions = message.channel.permissions_for(message.guild.me)
-                        if not permissions.manage_messages:
-                            await channel.send("Não tenho permissão para deletar mensagens neste canal. Por favor, verifique se tenho a permissão 'Gerenciar Mensagens'.")
-                            return
-                        await referenced_message.delete()
-                        await channel.send("Mensagem referenciada deletada!")
-                    except discord.errors.Forbidden:
-                        await channel.send("Não tenho permissão para deletar mensagens neste canal. Por favor, verifique se tenho a permissão 'Gerenciar Mensagens'.")
-                    except discord.errors.NotFound:
-                        await channel.send("A mensagem referenciada não foi encontrada.")
-                    except Exception as e:
-                        print(f"Erro ao deletar mensagem referenciada: {e}")
-                        await channel.send("Erro ao tentar deletar a mensagem referenciada.")
-                    return
-                elif await is_delete_intent(message.content, language):
-                    await channel.send("Por favor, responda à mensagem que deseja apagar.")
-                    return
+@bot.command(name="voz")
+async def join_voice(ctx):
+    if ctx.author.voice:
+        channel = ctx.author.voice.channel
+        voice_client = await channel.connect()
+        # Inicia interação por voz
+        asyncio.create_task(voice_handler.handle_voice_interaction(voice_client, ai, ctx.channel))
+    else:
+        await ctx.send("Você precisa estar em um canal de voz!")
 
-                # Configurar canal
-                if "set channel" in msg_content and message.author.guild_permissions.administrator:
-                    config["allowed_channels"].append(message.channel.id)
-                    try:
-                        with open(CONFIG_FILE, "w") as f:
-                            json.dump(config, f, indent=2)
-                        await channel.send(f"Canal {message.channel.mention} agora é permitido!")
-                    except IOError as e:
-                        print(f"Erro ao salvar configuração: {e}")
-                        await channel.send("Erro ao configurar o canal.")
-                    return
-
-                # Mudar idioma
-                if any(keyword in msg_content for keyword in ["fale em", "speak in"]):
-                    for lang in ["português", "espanhol", "inglês", "french", "spanish", "portuguese"]:
-                        if lang in msg_content:
-                            lang_code = {"português": "pt", "portuguese": "pt", "espanhol": "es", "spanish": "es", "inglês": "en", "french": "fr"}[lang]
-                            config["user_languages"][user_id] = lang_code
-                            with open(CONFIG_FILE, "w") as f:
-                                json.dump(config, f, indent=2)
-                            await channel.send(f"Agora vou responder em {lang}!")
-                            return
-
-                # Resposta padrão
-                if any(keyword in msg_content for keyword in ["qual é o seu modelo", "qual modelo você é", "quem é você", "qual é o modelo"]):
-                    reply = "Eu sou Revolution, um assistente baseado no modelo gpt-4.1-2025-04-14, com conhecimento atualizado até abril de 2025, criado para ajudar no Discord!"
-                    memory.append({"role": "user", "content": message.content})
-                    memory.append({"role": "assistant", "content": reply})
-                else:
-                    memory.append({"role": "user", "content": message.content})
-                    if len(memory) > MAX_MEMORY_MESSAGES:
-                        memory = await summarize_memory(memory[-MAX_MEMORY_MESSAGES:])
-                    while contar_tokens(memory) > MAX_TOKENS:
-                        memory = memory[1:]
-                    reply = await ask_openai(memory, language)
-                    memory.append({"role": "assistant", "content": reply})
-
-                try:
-                    with open(MEMORY_FILE, "w") as f:
-                        json.dump(memory, f, indent=2)
-                except IOError as e:
-                    print(f"Erro ao salvar memória: {e}")
-                await channel.send(reply)
-
-                # Enviar áudio
-                if reply:
-                    audio_file = await text_to_speech(reply, language)
-                    await channel.send(file=discord.File(audio_file))
-            except Exception as e:
-                print(f"Erro no processamento da mensagem: {e}")
-                await channel.send("Desculpe, ocorreu um erro ao processar sua mensagem.")
-        else:
-            await channel.send("Por favor, use este bot em um canal permitido.")
-
-# Rodar o bot
-client.run(DISCORD_TOKEN)
+bot.run(os.getenv("DISCORD_TOKEN"))
