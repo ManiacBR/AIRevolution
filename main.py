@@ -9,7 +9,7 @@ OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY")
 
 # Inicializa cliente OpenAI (>=1.0.0)
 oai = OpenAI(api_key=OPENAI_API_KEY)
-MODEL = "gpt-4.1"  # Modelo principal da série GPT‑4.1
+MODEL = "o4-mini-2025-04-16"  # Modelo principal da série GPT‑4.1
 
 # 🧠 Memória persistente em arquivo
 try:
