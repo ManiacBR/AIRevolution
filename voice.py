@@ -18,8 +18,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class VoiceHandler:
-    def __init__(self):
+    def __init__(self, db):
         logger.info("Inicializando VoiceHandler")
+        self.db = db  # Armazena a instância de db
         try:
             self.recognizer = sr.Recognizer()
             self.engine = pyttsx3.init()
@@ -89,7 +90,7 @@ class VoiceHandler:
                     logger.info(f"Processando entrada do usuário: {user_input}")
                     response = await ai.generate_response(
                         user_input,
-                        context=db.get_context(str(channel.guild.id), str(channel.guild.id)),
+                        context=self.db.get_context(str(channel.guild.id), str(channel.guild.id)),
                         extra_instruction="Responda sempre em português."
                     )
                     await channel.send(response)
