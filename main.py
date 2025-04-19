@@ -4,15 +4,11 @@ import json
 import asyncio
 import tiktoken
 from openai import OpenAI
-from dotenv import load_dotenv
 
-# Carrega variáveis de ambiente
-load_dotenv()
+# Definir variáveis diretamente no código
+DISCORD_TOKEN = "seu_token_do_discord"  # Coloque o seu token do Discord aqui
+OPENAI_API_KEY = "sua_chave_da_openai"  # Coloque sua chave da API da OpenAI aqui
 
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# Verifica se as variáveis de ambiente estão setadas
 if not DISCORD_TOKEN:
     raise ValueError("Variável DISCORD_TOKEN não encontrada.")
 if not OPENAI_API_KEY:
