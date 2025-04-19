@@ -3,6 +3,8 @@ import pyttsx3
 import discord
 import asyncio
 import logging
+import io
+import wave
 
 # Configura logging
 logging.basicConfig(
@@ -25,26 +27,6 @@ class VoiceHandler:
             logger.error(f"Erro ao inicializar VoiceHandler: {str(e)}")
             raise
 
-    async def listen(self, voice_client, timeout=15):
-        logger.info("Iniciando escuta de áudio")
-        loop = asyncio.get_event_loop()
-        with sr.Microphone() as source:
-            self.recognizer.adjust_for_ambient_noise(source)
-            try:
-                audio = await loop.run_in_executor(None, lambda: self.recognizer.listen(source, timeout=timeout))
-                text = await loop.run_in_executor(None, lambda: self.recognizer.recognize_google(audio))
-                logger.info(f"Áudio transcrito: {text}")
-                return text
-            except sr.UnknownValueError:
-                logger.warning("Nenhum áudio compreendido")
-                return None
-            except sr.RequestError as e:
-                logger.error(f"Erro na transcrição: {str(e)}")
-                return f"Erro na transcrição: {str(e)}"
-            except Exception as e:
-                logger.error(f"Erro inesperado na escuta: {str(e)}")
-                return f"Erro na escuta: {str(e)}"
-
     def speak(self, text):
         logger.info(f"Falando: {text}")
         try:
@@ -52,6 +34,40 @@ class VoiceHandler:
             self.engine.runAndWait()
         except Exception as e:
             logger.error(f"Erro ao falar: {str(e)}")
+
+    async def listen(self, voice_client, timeout=15):
+        logger.info("Iniciando escuta de áudio via Discord")
+        try:
+            # Configura um sink de áudio para capturar o stream
+            sink = discord.sinks.WaveSink()
+            voice_client.start_recording(sink, self.callback, None)
+            await asyncio.sleep(timeout)
+            voice_client.stop_recording()
+            
+            # Processa o áudio capturado
+            if sink.file:
+                audio_data = sink.file.getvalue()
+                wav_file = io.BytesIO(audio_data)
+                with wave.open(wav_file, 'rb') as wav:
+                    audio_source = sr.AudioFile(wav)
+                    with audio_source as source:
+                        audio = self.recognizer.record(source)
+                    text = self.recognizer.recognize_google(audio)
+                    logger.info(f"Áudio transcrito: {text}")
+                    return text
+            return None
+        except sr.UnknownValueError:
+            logger.warning("Nenhum áudio compreendido")
+            return None
+        except sr.RequestError as e:
+            logger.error(f"Erro na transcrição: {str(e)}")
+            return f"Erro na transcrição: {str(e)}"
+        except Exception as e:
+            logger.error(f"Erro inesperado na escuta: {str(e)}")
+            return f"Erro na escuta: {str(e)}"
+
+    async def callback(self, sink, *args):
+        logger.info("Callback de gravação chamado")
 
     async def handle_voice_interaction(self, voice_client, ai, channel):
         logger.info("Iniciando interação por voz")
