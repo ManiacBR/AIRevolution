@@ -5,8 +5,7 @@ import asyncio
 import tiktoken
 from openai import OpenAI
 from github import Github
-from datetime import datetime, timedelta
-from collections import defaultdict
+from datetime import datetime, timedelta, UTC  # Importar UTC
 
 # Carregar variáveis de ambiente
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -52,6 +51,24 @@ async def summarize_memory(memory):
     summary = response.choices[0].message.content
     return [{"role": "system", "content": f"Resumo do histórico: {summary}"}]
 
+# Função para verificar intenção de deleção
+async def is_delete_intent(message_content, language="pt"):
+    try:
+        prompt = [
+            {"role": "system", "content": f"Determine se a mensagem indica uma intenção de deletar uma mensagem no Discord. Responda apenas 'sim' ou 'não' em {language}."},
+            {"role": "user", "content": message_content}
+        ]
+        response = openai_client.chat.completions.create(
+            model="gpt-4.1-2025-04-14",
+            messages=prompt,
+            temperature=0.3,
+            max_tokens=10
+        )
+        return response.choices[0].message.content.lower() == "sim"
+    except Exception as e:
+        print(f"Erro ao verificar intenção de deleção: {e}")
+        return False
+
 # Configurações
 MEMORY_FILE = "memory.json"
 CONFIG_FILE = "config.json"
@@ -83,7 +100,7 @@ except FileNotFoundError:
 user_cooldowns = defaultdict(lambda: {"count": 0, "last_time": None})
 
 # Função para interagir com o OpenAI
-async def ask_openai(memory, language="en"):
+async def ask_openai(memory, language="pt"):
     try:
         prompt = [{"role": "system", "content": f"Responda em {language}."}] + memory
         response = openai_client.chat.completions.create(
@@ -110,7 +127,7 @@ async def on_message(message):
 
     # Verificar cooldown
     user_id = str(message.author.id)
-    now = datetime.utcnow()
+    now = datetime.now(UTC)  # Corrigido: usar datetime.now(UTC)
     if user_cooldowns[user_id]["last_time"] and now - user_cooldowns[user_id]["last_time"] < timedelta(seconds=COOLDOWN_SECONDS):
         if user_cooldowns[user_id]["count"] >= MAX_MESSAGES_PER_COOLDOWN:
             await message.channel.send("Você está enviando mensagens rápido demais. Tente novamente em um minuto.")
@@ -123,33 +140,29 @@ async def on_message(message):
         if not config["allowed_channels"] or message.channel.id in config["allowed_channels"]:
             try:
                 msg_content = message.content.lower()
-                thread = None
                 channel = message.channel
-                if isinstance(message.channel, discord.TextChannel):
-                    thread = await message.create_thread(name=f"Conversa com {message.author.name}", auto_archive_duration=60)
-                    channel = thread
+                language = config["user_languages"].get(user_id, "pt")  # Default para português
 
-                # Deletar mensagem referenciada
-                if any(keyword in msg_content for keyword in ["apaga", "delete", "remove"]):
-                    if message.reference:  # Verifica se há uma mensagem referenciada
-                        try:
-                            referenced_message = await message.channel.fetch_message(message.reference.message_id)
-                            # Verificar permissões
-                            permissions = message.channel.permissions_for(message.guild.me)
-                            if not permissions.manage_messages:
-                                await channel.send("Não tenho permissão para deletar mensagens neste canal.")
-                                return
-                            await referenced_message.delete()
-                            await channel.send("Mensagem referenciada deletada!")
-                        except discord.errors.Forbidden:
-                            await channel.send("Não tenho permissão para deletar mensagens neste canal.")
-                        except discord.errors.NotFound:
-                            await channel.send("A mensagem referenciada não foi encontrada.")
-                        except Exception as e:
-                            print(f"Erro ao deletar mensagem referenciada: {e}")
-                            await channel.send("Erro ao tentar deletar a mensagem referenciada.")
-                    else:
-                        await channel.send("Por favor, responda à mensagem que deseja apagar.")
+                # Verificar intenção de deleção
+                if await is_delete_intent(message.content, language) and message.reference:
+                    try:
+                        referenced_message = await message.channel.fetch_message(message.reference.message_id)
+                        permissions = message.channel.permissions_for(message.guild.me)
+                        if not permissions.manage_messages:
+                            await channel.send("Não tenho permissão para deletar mensagens neste canal. Por favor, verifique se tenho a permissão 'Gerenciar Mensagens'.")
+                            return
+                        await referenced_message.delete()
+                        await channel.send("Mensagem referenciada deletada!")
+                    except discord.errors.Forbidden:
+                        await channel.send("Não tenho permissão para deletar mensagens neste canal. Por favor, verifique se tenho a permissão 'Gerenciar Mensagens'.")
+                    except discord.errors.NotFound:
+                        await channel.send("A mensagem referenciada não foi encontrada.")
+                    except Exception as e:
+                        print(f"Erro ao deletar mensagem referenciada: {e}")
+                        await channel.send("Erro ao tentar deletar a mensagem referenciada.")
+                    return
+                elif await is_delete_intent(message.content, language):
+                    await channel.send("Por favor, responda à mensagem que deseja apagar.")
                     return
 
                 # Configurar canal
@@ -208,7 +221,6 @@ async def on_message(message):
                         memory = await summarize_memory(memory[-MAX_MEMORY_MESSAGES:])
                     while contar_tokens(memory) > MAX_TOKENS:
                         memory = memory[1:]
-                    language = config["user_languages"].get(user_id, "en")
                     reply = await ask_openai(memory, language)
                     memory.append({"role": "assistant", "content": reply})
 
@@ -222,7 +234,7 @@ async def on_message(message):
                 print(f"Erro no processamento da mensagem: {e}")
                 await channel.send("Desculpe, ocorreu um erro ao processar sua mensagem.")
         else:
-            await message.channel.send("Por favor, use este bot em um canal permitido.")
+            await channel.send("Por favor, use este bot em um canal permitido.")
 
 # Rodar o bot
 client.run(DISCORD_TOKEN)
