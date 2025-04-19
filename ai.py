@@ -9,11 +9,12 @@ class AIRevolution:
         self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model = "gpt-4.1-2025-04-14"
 
-    async def generate_response(self, prompt, context=[]):
+    async def generate_response(self, prompt, context=None, extra_instruction=""):
+        if context is None:
+            context = []
         messages = [
-            {"role": "system", "content": "You are AI Revolution, a highly intelligent and friendly Discord bot inspired by Jarvis from Iron Man. Be concise, witty, and helpful. Keep responses under 2000 characters."}
+            {"role": "system", "content": f"You are AI Revolution, a highly intelligent and friendly Discord bot inspired by Jarvis from Iron Man. Be concise, witty, and helpful. Keep responses under 2000 characters. {extra_instruction}"}
         ]
-        # Adiciona o contexto da conversa
         for msg in context:
             messages.append({"role": "user", "content": msg})
         messages.append({"role": "user", "content": prompt})
@@ -26,7 +27,6 @@ class AIRevolution:
                 temperature=0.7
             )
             text = response.choices[0].message.content.strip()
-            # Garante que a resposta não exceda 2000 caracteres
             if len(text) > 2000:
                 text = text[:1997] + "..."
             return text
