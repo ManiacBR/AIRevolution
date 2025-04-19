@@ -1,11 +1,12 @@
 # Usa a imagem base do Python 3.11 para incluir distutils
 FROM python:3.11
 
-# Instala dependências do sistema (libespeak para pyttsx3, portaudio e alsa para áudio)
+# Instala dependências do sistema (libespeak para pyttsx3, portaudio, alsa e ffmpeg para áudio)
 RUN apt-get update && apt-get install -y \
     libespeak1 \
     portaudio19-dev \
     libasound-dev \
+    ffmpeg \
     build-essential \
     gcc \
     python3-dev \
