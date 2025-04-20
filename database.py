@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 class ConversationDatabase:
     def __init__(self, db_name="conversations.db"):
-        # Conecta ao banco de dados SQLite (ou cria o arquivo se não existir)
+        # Conecta  ao banco de dados SQLite (ou cria o arquivo se não existir)
         self.conn = sqlite3.connect(db_name)
         self.create_table()
 
